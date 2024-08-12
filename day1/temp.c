@@ -39,13 +39,14 @@ uint8_t default_tx[32] = {
 #endif
 #if (FIFO_DEPTH_DEFINDED == 32)
 uint16_t default_tx[FIFO_DEPTH_DEFINDED] = {
-	0xAAA1, 0xAAA2, 0xAAA3, 0xFF, 0xFF, 0xFF,
-	0x4040, 0x00, 0x00, 0x00, 0x00, 0x0F,
-	0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-	0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-	0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-	0xF0, 0xD0
+        0xAAA1, 0xAAA2, 0xAAA3, 0xFF, 0xFF, 0xFF,
+        0x4040, 0x00, 0x00, 0x00, 0x00, 0x0F,
+        0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+        0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+        0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+        0xF0, 0xD0
 };
+
 #endif
 #if (FIFO_DEPTH_DEFINDED == 16)
 uint16_t default_tx[FIFO_DEPTH_DEFINDED] = {
@@ -152,6 +153,77 @@ static void transfer(int fd, uint16_t const *tx, uint16_t const *rx, size_t len,
 			hex_dump(tx, len, 64, "TX");
 		hex_dump(rx, len, 64, "RX");
 	}
+}
+
+static void slave_transfer(int fd, uint16_t const *tx, uint16_t *rx, size_t len, int dump_flag) {
+    int ret;
+    struct spi_ioc_transfer tr = {
+        .tx_buf = (unsigned long)tx,
+        .rx_buf = (unsigned long)rx,
+        .len = len,
+        .delay_usecs = delay,
+        .speed_hz = speed,
+        .bits_per_word = bits,
+    };
+
+    if (mode & SPI_TX_QUAD)
+        tr.tx_nbits = 4;
+    else if (mode & SPI_TX_DUAL)
+        tr.tx_nbits = 2;
+    if (mode & SPI_RX_QUAD)
+        tr.rx_nbits = 4;
+    else if (mode & SPI_RX_DUAL)
+        tr.rx_nbits = 2;
+    if (!(mode & SPI_LOOP)) {
+        if (mode & (SPI_TX_QUAD | SPI_TX_DUAL))
+            tr.rx_buf = 0;
+        else if (mode & (SPI_RX_QUAD | SPI_RX_DUAL))
+            tr.tx_buf = 0;
+    }
+
+    ret = ioctl(fd, SPI_IOC_MESSAGE(1), &tr);
+    if (ret < 1)
+        pabort("can't send spi message");
+
+    if (len != FIFO_DEPTH_DEFINDED * 2)
+        printf("length : %d\n", len);
+
+    if (dump_flag) {
+        if (verbose)
+            hex_dump(tx, len, 64, "TX");
+        hex_dump(rx, len, 64, "RX");
+    }
+
+    // Check if there is valid data in the RX buffer
+    int valid_data = 0;
+    for (size_t i = 0; i < len / sizeof(uint16_t); i++) {
+        if (rx[i] != 0) {
+            valid_data = 1;
+            break;
+        }
+    }
+
+    // If valid data is received, echo it back
+    if (valid_data) {
+        struct spi_ioc_transfer tr_echo = {
+            .tx_buf = (unsigned long)rx,
+            .rx_buf = (unsigned long)tx,
+            .len = len,
+            .delay_usecs = delay,
+            .speed_hz = speed,
+            .bits_per_word = bits,
+        };
+
+        ret = ioctl(fd, SPI_IOC_MESSAGE(1), &tr_echo);
+        if (ret < 1)
+            pabort("can't send spi message");
+
+        if (dump_flag) {
+            if (verbose)
+                hex_dump(rx, len, 64, "TX (echo)");
+            hex_dump(tx, len, 64, "RX (echo)");
+        }
+    }
 }
 
 static void print_usage(const char *prog)
@@ -329,7 +401,8 @@ int main(int argc, char *argv[])
 		if (fd < 0)
 			pabort("can't open device");
 		printf("SPI SLAVE TEST 32 bytes one Shot ^^ \n");
-		transfer(fd, default_tx, default_rx, sizeof(default_tx), 1);
+		slave_transfer(fd, default_rx, default_rx, sizeof(default_rx), 1);
+		
 	}else {
 		printf("SPI SLAVE TEST START  %d time \n", testCount);
 		printf("SPI SLAVE TEST %d X 2(uint16) Bytes  %d bits word [%d] ea Shot \n",FIFO_DEPTH_DEFINDED , bits ,DATA_EA);
@@ -357,54 +430,29 @@ int main(int argc, char *argv[])
 				transfer(fd, default_tx, default_rx, sizeof(default_tx), 1);
 			}
 			else{
-						transfer(fd, default_tx, default_rx, sizeof(default_tx), 0);
-						if ( default_rx[0] != 0x1234 ||  default_rx[1] !=0x4567){
-								printf("Err: num  %d [%x][%x] \n", i, default_rx[0],default_rx[1]);
-								hex_dump(default_rx, sizeof(default_rx), 64, "RX");
+					int flag = 0;
+					transfer(fd, default_tx, default_rx, sizeof(default_tx), 0);
+					for (int j=0; j < FIFO_DEPTH_DEFINDED; j++){
+						if (default_rx[j] != default_tx[j]){
+							printf("Err: num  %d [%x][%x] \n", i, default_rx[j],default_tx[j]);
+							flag = 1;
+							break;
 						}
+					}
+					if (flag){
+						printf("SPI Read OK\n");
+					}
+					else{
+						printf("SPI Read FAIL\n");
 					}
 				}
 			}
 		}
-	close(fd);
+		
 	}
+	close(fd);
 	printf("SPI SLAVE TEST END \n");
+
+	}
 	return ret;
 }
-
-
-4. SPI Slave Test
-SPI Slave 동작을 테스트 하기 위해서 spidev_test를 사용할 수 있습니다.
-
-SPI Slave Device로 spidev5.0을 사용하고 master device를 spidev4.0을 사용한다며  다음과 같이 command를 입력합니다.
-
-SPI Slave에서 Data Transfer를 위한 Buffer를 등록한 상태에서 Master에서 Data요청을 진행합니다.
-
-Master가 먼저 실행될 경우, Slave에서 데이터가 준비되어 있지 않기 때문에 정상적으로 동작하지 않습니다. 
-
-SPI Slave의 경우 Master에서 SPI Clock을 받아야 동작하는 구조이며, Test Application에서 요청한 Buffer Size만큼 데이터를 받아야 Application이 종료됩니다. 
-
-통신을 확인 하기 위해서는 Master와 Slave가 동일한 Pattern을 주고 받기 때문에 RX로 들어온 Pattern이 동일한지 확인하면 됩니다. 
-
-slave application 
-
-$ ./spidev_test  -D /dev/spidev5.0 -S   -v
-
-max speed: 25000000 Hz (25000 KHz) 
-SPI SLAVE TEST 32 bytes one Shot ^^ 
-TX | A1 AA A2 AA A3 AA FF 00 FF 00 FF 00 40 40 00 00 00 00 00 00 00 00 0F 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 F0 00 D0 00  | ������......@@..............................................�.�.
-RX | A1 AA A2 AA A3 AA FF 00 FF 00 FF 00 40 40 00 00 00 00 00 00 00 00 0F 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 F0 00 D0 00  | ������......@@..............................................�.�.
-SPI SLAVE TEST END 
-
-------------------------------------------------------------------------------------------------------------------------------------------------------
-
-master application
-
-$ ./spidev_test -D /dev/spidev4.0  -v
-
-max speed: 25000000 Hz (25000 KHz) 
-SPI SLAVE TEST START  0 time 
-SPI SLAVE TEST 32 X 2(uint16) Bytes  16 bits word [1] ea Shot 
-Err: num  0 [aaa1][aaa2] 
-RX | A1 AA A2 AA A3 AA FF 00 FF 00 FF 00 40 40 00 00 00 00 00 00 00 00 0F 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 F0 00 D0 00  | ������......@@..............................................�.�.
-SPI SLAVE TEST END 
