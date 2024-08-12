@@ -371,3 +371,40 @@ int main(int argc, char *argv[])
 	printf("SPI SLAVE TEST END \n");
 	return ret;
 }
+
+
+4. SPI Slave Test
+SPI Slave 동작을 테스트 하기 위해서 spidev_test를 사용할 수 있습니다.
+
+SPI Slave Device로 spidev5.0을 사용하고 master device를 spidev4.0을 사용한다며  다음과 같이 command를 입력합니다.
+
+SPI Slave에서 Data Transfer를 위한 Buffer를 등록한 상태에서 Master에서 Data요청을 진행합니다.
+
+Master가 먼저 실행될 경우, Slave에서 데이터가 준비되어 있지 않기 때문에 정상적으로 동작하지 않습니다. 
+
+SPI Slave의 경우 Master에서 SPI Clock을 받아야 동작하는 구조이며, Test Application에서 요청한 Buffer Size만큼 데이터를 받아야 Application이 종료됩니다. 
+
+통신을 확인 하기 위해서는 Master와 Slave가 동일한 Pattern을 주고 받기 때문에 RX로 들어온 Pattern이 동일한지 확인하면 됩니다. 
+
+slave application 
+
+$ ./spidev_test  -D /dev/spidev5.0 -S   -v
+
+max speed: 25000000 Hz (25000 KHz) 
+SPI SLAVE TEST 32 bytes one Shot ^^ 
+TX | A1 AA A2 AA A3 AA FF 00 FF 00 FF 00 40 40 00 00 00 00 00 00 00 00 0F 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 F0 00 D0 00  | ������......@@..............................................�.�.
+RX | A1 AA A2 AA A3 AA FF 00 FF 00 FF 00 40 40 00 00 00 00 00 00 00 00 0F 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 F0 00 D0 00  | ������......@@..............................................�.�.
+SPI SLAVE TEST END 
+
+------------------------------------------------------------------------------------------------------------------------------------------------------
+
+master application
+
+$ ./spidev_test -D /dev/spidev4.0  -v
+
+max speed: 25000000 Hz (25000 KHz) 
+SPI SLAVE TEST START  0 time 
+SPI SLAVE TEST 32 X 2(uint16) Bytes  16 bits word [1] ea Shot 
+Err: num  0 [aaa1][aaa2] 
+RX | A1 AA A2 AA A3 AA FF 00 FF 00 FF 00 40 40 00 00 00 00 00 00 00 00 0F 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 F0 00 D0 00  | ������......@@..............................................�.�.
+SPI SLAVE TEST END 
