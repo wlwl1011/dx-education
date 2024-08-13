@@ -25,7 +25,7 @@
 
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
 #define FIFO_DEPTH_DEFINDED	(32)
-
+#define DEFAULT_DATA_SIZE (256)
 
 static void pabort(const char *s)
 {
@@ -42,6 +42,8 @@ static int verbose;
 static int spidev3_0;
 static int spislave;
 int testCount = 1;
+static int data_size = DEFAULT_DATA_SIZE;
+
 
 #if (0)
 uint8_t default_tx[32] = {
@@ -174,8 +176,8 @@ static void master_transfer(int fd, uint16_t const *tx, uint16_t const *rx, size
 	ret = ioctl(fd, SPI_IOC_MESSAGE(1), &tr_transfer);
 	if (ret < 1)
 		pabort("can't send spi message");
-	if (len != FIFO_DEPTH_DEFINDED*2)
-		printf("length : %d\n", len);
+	// if (len != FIFO_DEPTH_DEFINDED*2)
+	// 	printf("length : %d\n", len);
 	if (dump_flag){
 		hex_dump(tx, len, 64, "TX");
 	}
@@ -209,8 +211,8 @@ static void master_transfer(int fd, uint16_t const *tx, uint16_t const *rx, size
 	ret = ioctl(fd, SPI_IOC_MESSAGE(1), &tr_recived);
 	if (ret < 1)
 		pabort("can't send spi message");
-	if (len != FIFO_DEPTH_DEFINDED*2)
-		printf("length : %d\n", len);
+	// if (len != FIFO_DEPTH_DEFINDED*2)
+	// 	printf("length : %d\n", len);
 	if (dump_flag){
 		hex_dump(tx, len, 64, "RX");
 	}
@@ -250,8 +252,8 @@ static void slave_transfer(int fd, uint16_t const *rx, size_t len, int dump_flag
 	ret = ioctl(fd, SPI_IOC_MESSAGE(1), &tr_recieve);
 	if (ret < 1)
 		pabort("can't send spi message");
-	if (len != FIFO_DEPTH_DEFINDED*2)
-		printf("length : %d\n", len);
+	// if (len != FIFO_DEPTH_DEFINDED*2)
+	// 	printf("length : %d\n", len);
 	if (dump_flag){
 		hex_dump(rx, len, 64, "RX");
 	}
@@ -284,8 +286,8 @@ static void slave_transfer(int fd, uint16_t const *rx, size_t len, int dump_flag
 	ret = ioctl(fd, SPI_IOC_MESSAGE(1), &tr_transfer);
 	if (ret < 1)
 		pabort("can't send spi message");
-	if (len != FIFO_DEPTH_DEFINDED*2)
-		printf("length : %d\n", len);
+	// if (len != FIFO_DEPTH_DEFINDED*2)
+	// 	printf("length : %d\n", len);
 	if (dump_flag){
 		hex_dump(rx, len, 64, "RX");
 	}
@@ -388,7 +390,11 @@ static void parse_opts(int argc, char *argv[])
 			mode |= SPI_READY;
 			break;
 		case 'p':
-			input_tx = optarg;
+			data_size = atoi(optarg);
+			if (data_size > 256 || data_size <= 0) {
+				fprintf(stderr, "Data size must be between 1 and 256 bytes.\n");
+				exit(EXIT_FAILURE);
+			}
 			break;
 		case '2':
 			mode |= SPI_TX_DUAL;
@@ -430,6 +436,19 @@ int main(int argc, char *argv[])
 	spidev3_0 = 0;
 
 	parse_opts(argc, argv);
+
+	tx = malloc(data_size);
+    rx = malloc(data_size);
+
+	if (tx == NULL || rx == NULL) {
+        pabort("Failed to allocate memory for buffers");
+    }
+	
+	 // 데이터 버퍼 초기화 (예시로 패턴 생성)
+    for (i = 0; i < data_size; i++) {
+        tx[i] = i % 256;
+        rx[i] = 0;
+    }
 
 
 	mode = SPI_MODE_3;
@@ -487,10 +506,10 @@ int main(int argc, char *argv[])
 		if (fd < 0)
 			pabort("can't open device");
 		printf("SPI SLAVE TEST 32 bytes one Shot ^^ \n");
-		slave_transfer(fd, default_rx, sizeof(default_rx), 1);
+		slave_transfer(fd, rx, sizeof(rx), 1);
 	}else {
 		printf("SPI SLAVE TEST START  %d time \n", testCount);
-		printf("SPI SLAVE TEST %d X 2(uint16) Bytes  %d bits word [%d] ea Shot \n",FIFO_DEPTH_DEFINDED , bits ,DATA_EA);
+		printf("SPI SLAVE TEST %d X 2(uint16) Bytes  %d bits word [%d] ea Shot \n",data_size , bits ,DATA_EA);
 		fd = open(device, O_RDWR);
 		for (i = 0; i < DATA_EA; i++){
 //			fd = open(device, O_RDWR);
@@ -513,15 +532,18 @@ int main(int argc, char *argv[])
 
 			if (spislave){
 				printf("SPI SLAVE TEST 32 bytes one Shot \n");
-				master_transfer(fd, default_tx, default_rx, sizeof(default_tx), 1);
+				slave_transfer(fd,  rx, sizeof(tx), 1);
 			}
 			else{
 //						printf("SPI SLAVE TEST START %d time \n", testCount);
 //						printf("SPI SLAVE TEST %d X 2(uint16) Bytes  %d bits word [%d] ea Shot \n",FIFO_DEPTH_DEFINDED , bits ,DATA_EA);
-						master_transfer(fd, default_tx, default_rx, sizeof(default_tx), 0);
-						if ( default_rx[0] != 0x1234 ||  default_rx[1] !=0x4567){
-								printf("Err: num  %d [%x][%x] \n", i, default_rx[0],default_rx[1]);
-								hex_dump(default_rx, sizeof(default_rx), 64, "RX");
+						master_transfer(fd, default_tx, default_rx, sizeof(tx), 0);
+						int flag = 0;
+						for (int j = 0; j < data_size; j++) {
+							if (rx[j] != tx[j]) {
+								printf("Err: num %d [Sent: %x] [Received: %x] \n", j, tx[j], rx[j]);
+								flag = 1;
+							}
 						}
 					}
 				}
