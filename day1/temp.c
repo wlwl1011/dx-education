@@ -6,6 +6,7 @@
 #include <getopt.h>
 #include <fcntl.h>
 #include <sys/ioctl.h>
+#include <sys/poll.h>
 #include <linux/types.h>
 #include <linux/spi/spidev.h>
 
@@ -75,29 +76,6 @@ static void transfer(int fd, uint16_t const *tx, uint16_t *rx, size_t len, int d
         if (verbose)
             hex_dump(tx, len, 16, "TX");
         hex_dump(rx, len, 16, "RX");
-    }
-}
-
-static void slave_transfer(int fd, uint16_t *rx, uint16_t *tx, size_t len, int dump_flag) {
-    int ret;
-
-    // 수신한 데이터를 슬레이브가 그대로 에코함
-    struct spi_ioc_transfer tr = {
-        .tx_buf = (unsigned long)rx,
-        .rx_buf = (unsigned long)tx,
-        .len = len,
-        .delay_usecs = delay,
-        .speed_hz = speed,
-        .bits_per_word = bits,
-    };
-
-    ret = ioctl(fd, SPI_IOC_MESSAGE(1), &tr);
-    if (ret < 1)
-        pabort("can't send spi message");
-
-    if (dump_flag) {
-        hex_dump(rx, len, 16, "RX (received)");
-        hex_dump(rx, len, 16, "TX (echo)");
     }
 }
 
@@ -229,16 +207,13 @@ static void parse_opts(int argc, char *argv[])
     }
 }
 
-#define DATA_EA (1)		//(100000)
-
 int main(int argc, char *argv[])
 {
     int ret = 0;
-    int i = 0;
     int fd;
-    int testCount = 1;
     uint8_t *tx;
     uint8_t *rx;
+    struct pollfd fds[1];
 
     parse_opts(argc, argv);
     mode = SPI_MODE_3;
@@ -251,7 +226,7 @@ int main(int argc, char *argv[])
     }
 
     // 데이터 버퍼 초기화 (예시로 패턴 생성)
-    for (i = 0; i < data_size; i++) {
+    for (int i = 0; i < data_size; i++) {
         tx[i] = i % 256;
         rx[i] = 0;
     }
@@ -287,34 +262,66 @@ int main(int argc, char *argv[])
     printf("max speed: %d Hz (%d KHz) \n", speed, speed / 1000);
 
     if (spislave) {
-        printf("SPI SLAVE TEST %d bytes one Shot ^^ \n", data_size);
-        slave_transfer(fd, (uint16_t *)rx, (uint16_t *)tx, data_size, 1);
-    } else {
-        printf("SPI MASTER TEST START %d time \n", testCount);
-        for (i = 0; i < testCount; i++) {
-            printf("SPI MASTER TEST %d bytes data transfer \n", data_size);
-            transfer(fd, (uint16_t *)tx, (uint16_t *)rx, data_size, 1);
+        fds[0].fd = fd;
+        fds[0].events = POLLIN;
 
-            // 수신된 데이터가 송신된 데이터와 일치하는지 확인
-            int flag = 0;
-            for (int j = 0; j < data_size / 2; j++) {
-                if (rx[j] != tx[j]) {
-                    printf("Err: num %d [Sent: %x] [Received: %x] \n", j, tx[j], rx[j]);
-                    flag = 1;
-                    break;
-                }
-            }
-            if (!flag) {
-                printf("SPI Read OK\n");
-            } else {
-                printf("SPI Read FAIL\n");
-                printf("Sent data:\n");
-                hex_dump(tx, data_size, 16, "TX");
-                printf("Received data:\n");
+        while (1) {
+            printf("Waiting for SPI transaction...\n");
+
+            ret = poll(fds, 1, -1); // 무한 대기
+            if (ret < 0)
+                pabort("Poll failed");
+
+            if (fds[0].revents & POLLIN) {
+                ret = read(fd, rx, data_size);
+                if (ret < 0)
+                    pabort("Failed to read data from SPI");
+
+                printf("Received data on slave:\n");
                 hex_dump(rx, data_size, 16, "RX");
+
+                ret = write(fd, rx, data_size);
+                if (ret < 0)
+                    pabort("Failed to write data to SPI");
+
+                printf("Sent data back from slave:\n");
+                hex_dump(rx, data_size, 16, "TX");
             }
         }
-    close(fd);
+    } else {
+        printf("SPI MASTER TEST START \n");
+        printf("SPI MASTER TEST %d bytes data transfer \n", data_size);
+
+        ret = write(fd, tx, data_size);
+        if (ret < 0)
+            pabort("Failed to write data to SPI");
+
+        printf("Sent data from master:\n");
+        hex_dump(tx, data_size, 16, "TX");
+
+        // 마스터는 이제 슬레이브로부터 데이터를 읽음
+        ret = read(fd, rx, data_size);
+        if (ret < 0)
+            pabort("Failed to read data from SPI");
+
+        printf("Received data from slave:\n");
+        hex_dump(rx, data_size, 16, "RX");
+
+        // 수신된 데이터가 송신된 데이터와 일치하는지 확인
+        int flag = 0;
+        for (int j = 0; j < data_size; j++) {
+            if (rx[j] != tx[j]) {
+                printf("Err: num %d [Sent: %x] [Received: %x] \n", j, tx[j], rx[j]);
+                flag = 1;
+            }
+        }
+        if (!flag) {
+            printf("SPI Read OK\n");
+        } else {
+            printf("SPI Read FAIL\n");
+        }
+
+        close(fd);
     }
 
     free(tx);
