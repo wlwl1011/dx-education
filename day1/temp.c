@@ -317,6 +317,7 @@ int main(int argc, char *argv[])
     int ret = 0;
     int i = 0;
     int fd;
+	int testCount = 1;
     uint8_t *tx;
     uint8_t *rx;
 
@@ -390,12 +391,67 @@ int main(int argc, char *argv[])
                 printf("SPI Read FAIL\n");
             }
         }
-    }
-
     close(fd);
+	}
+
+    
     free(tx);
     free(rx);
     printf("SPI TEST END \n");
 
     return ret;
 }
+
+SPI Read OK                                                                                                                                            
+SPI TEST END                                                                                                                                           
+root@dq1:~# [ 1475.905383] INFO: task spidev_test:697 blocked for more than 61 seconds.                                                                
+[ 1475.912125]       Tainted: G           O      5.15.160-b0-saturn #1                                                                                 
+[ 1475.918407] "echo 0 > /proc/sys/kernel/hung_task_timeout_secs" disables this message.                                                               
+[ 1475.926246] task:spidev_test     state:D stack:    0 pid:  697 ppid:   382 flags:0x00000204                                                         
+[ 1475.934617] Call trace:                                                                                                                             
+[ 1475.937057]  __switch_to+0xf4/0x13c                                                                                                                 
+[ 1475.940570]  __schedule+0x360/0x854                                                                                                                 
+[ 1475.944072]  schedule+0x6c/0x13c                                                                                                                    
+[ 1475.947310]  schedule_timeout+0xf0/0x1ac                                                                                                            
+[ 1475.951246]  wait_for_completion+0x84/0x120                                                                                                         
+[ 1475.955440]  __spi_sync+0x168/0x310                                                                                                                 
+[ 1475.958942]  spi_sync+0x30/0x5c                                                                                                                     
+[ 1475.962093]  spidev_message+0x3c0/0x584                                                                                                             
+[ 1475.965939]  spidev_ioctl+0xae0/0xda0                                                                                                               
+[ 1475.969611]  __arm64_sys_ioctl+0x5e4/0x1580                                                                                                         
+[ 1475.973807]  invoke_syscall.constprop.0+0x5c/0x110                                                                                                  
+[ 1475.978612]  do_el0_svc+0x144/0x160                                                                                                                 
+[ 1475.982112]  el0_svc+0x28/0xc0                                                                                                                      
+[ 1475.985166]  el0t_64_sync_handler+0xa4/0x130                                                                                                        
+[ 1475.989447]  el0t_64_sync+0x1a4/0x1a8                                                                                                               
+[ 1475.993111] Kernel panic - not syncing: hung_task: blocked tasks                                                                                    
+[ 1475.999112] CPU: 2 PID: 42 Comm: khungtaskd Tainted: G           O      5.15.160-b0-saturn #1                                                       
+[ 1476.007634] Hardware name: LG Electronics, Intelligent SoC DQ1 (AArch64) Airsol-CoreBoard (DT)                                                      
+[ 1476.016237] Call trace:                                                                                                                             
+[ 1476.018674]  dump_backtrace+0x0/0x1cc                                                                                                               
+[ 1476.022336]  show_stack+0x18/0x24                                                                                                                   
+[ 1476.025649]  dump_stack_lvl+0x7c/0xa0                                                                                                               
+[ 1476.029311]  dump_stack+0x18/0x34                                                                                                                   
+[ 1476.032623]  panic+0x17c/0x3c4                                                                                                                      
+[ 1476.035674]  watchdog+0x2e0/0x4cc                                                                                                                   
+[ 1476.038988]  kthread+0x154/0x160                                                                                                                    
+[ 1476.042216]  ret_from_fork+0x10/0x20                                                                                                                
+[ 1476.045882] SMP: stopping secondary CPUs                                                                                                            
+[ 1476.049913] dq1-panic: dq1_panic_handler CPU #2                                                                                                     
+[ 1476.054541] Kernel Offset: disabled                                                                                                                 
+[ 1476.058023] CPU features: 0x0,00000000,00000842                                                                                                     
+[ 1476.062550] Memory Limit: none                                                                                                                      
+[ 1476.074982] Rebooting in 5 seconds..                                                                                                                
+DQ1 CPBL                                                                                                                                               
+Boot CLK : OSC_CLK                                                                                                                                     
+Boot device : eMMC                                                                                                                                     
+Boot mode : Normal                                                                                                                                     
+eMMC Boot mode                                                                                                                                         
+DM                                                                                                                                                     
+DQ1 CSBL_b0-nextacp-Ver1.6.0(f05b1a5)                                                                                                                  
+Debug mode                                                                                                                                             
+Supported config: RAMDUMP USB1, DDR X32/924MHz                                                                                                         
+Reason Panic                                                                                                                                           
+RamDump  CSBL                                                                                                                                          
+usb ramdump driver init (usb1)                                                                                                                         
+USB Connected        
