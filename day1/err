@@ -411,3 +411,18 @@ ErrorExit :
 	return rc;
 }
 
+
+// Read
+i2c_dq1 r start_address read_len
+// write
+i2c_dq1 w start_address data0 data1 data2 ..
+ 
+Example)
+i2c_dq1 r 0 10 /* address 0번부터 10개의 register를 read 함 */
+i2c_dq1 w 0 1 2 3 4 5  /* address 0 부터 1,2,3,4,5 총 5개의 data를 write 함 */
+
+
+400kb/s 속도로 (가변) byte 문자열 손상 없이 송신
+400kb/s 속도로 (가변) byte 문자열 손상 없이 수신
+
+
