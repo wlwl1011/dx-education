@@ -206,7 +206,7 @@ static void parse_opts(int argc, char *argv[])
     }
 }
 
-#define DATA_EA (1)		//(100000)
+#define DATA_EA (1)
 
 int main(int argc, char *argv[])
 {
@@ -264,20 +264,22 @@ int main(int argc, char *argv[])
     printf("max speed: %d Hz (%d KHz) \n", speed, speed / 1000);
 
     if (spislave) {
-        printf("SPI SLAVE TEST %d bytes one Shot ^^ \n", data_size);
-        ret = read(fd, rx, data_size);
-        if (ret < 0)
-            pabort("Failed to read data from SPI");
-        
-        printf("Received data on slave:\n");
-        hex_dump(rx, data_size, 16, "RX");
+        while (1) {
+            printf("SPI SLAVE TEST %d bytes one Shot ^^ \n", data_size);
+            ret = read(fd, rx, data_size);
+            if (ret < 0)
+                pabort("Failed to read data from SPI");
 
-        ret = write(fd, rx, data_size);
-        if (ret < 0)
-            pabort("Failed to write data to SPI");
+            printf("Received data on slave:\n");
+            hex_dump(rx, data_size, 16, "RX");
 
-        printf("Sent data back from slave:\n");
-        hex_dump(rx, data_size, 16, "TX");
+            ret = write(fd, rx, data_size);
+            if (ret < 0)
+                pabort("Failed to write data to SPI");
+
+            printf("Sent data back from slave:\n");
+            hex_dump(rx, data_size, 16, "TX");
+        }
     } else {
         printf("SPI MASTER TEST START %d time \n", testCount);
         for (i = 0; i < testCount; i++) {
