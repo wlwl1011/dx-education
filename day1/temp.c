@@ -54,27 +54,7 @@ static void hex_dump(const void *src, size_t length, size_t line_size, char *pre
     }
 }
 
-static int unescape(char *_dst, char *_src, size_t len)
-{
-    int ret = 0;
-    char *src = _src;
-    char *dst = _dst;
-    unsigned int ch;
-
-    while (*src) {
-        if (*src == '\\' && *(src + 1) == 'x') {
-            sscanf(src + 2, "%2x", &ch);
-            src += 4;
-            *dst++ = (unsigned char)ch;
-        } else {
-            *dst++ = *src++;
-        }
-        ret++;
-    }
-    return ret;
-}
-
-static void transfer(int fd, uint16_t const *tx, uint16_t const *rx, size_t len, int dump_flag)
+static void transfer(int fd, uint16_t const *tx, uint16_t *rx, size_t len, int dump_flag)
 {
     int ret;
 
@@ -87,21 +67,6 @@ static void transfer(int fd, uint16_t const *tx, uint16_t const *rx, size_t len,
         .bits_per_word = bits,
     };
 
-    if (mode & SPI_TX_QUAD)
-        tr.tx_nbits = 4;
-    else if (mode & SPI_TX_DUAL)
-        tr.tx_nbits = 2;
-    if (mode & SPI_RX_QUAD)
-        tr.rx_nbits = 4;
-    else if (mode & SPI_RX_DUAL)
-        tr.rx_nbits = 2;
-    if (!(mode & SPI_LOOP)) {
-        if (mode & (SPI_TX_QUAD | SPI_TX_DUAL))
-            tr.rx_buf = 0;
-        else if (mode & (SPI_RX_QUAD | SPI_RX_DUAL))
-            tr.tx_buf = 0;
-    }
-
     ret = ioctl(fd, SPI_IOC_MESSAGE(1), &tr);
     if (ret < 1)
         pabort("can't send spi message");
@@ -113,43 +78,25 @@ static void transfer(int fd, uint16_t const *tx, uint16_t const *rx, size_t len,
     }
 }
 
-static void slave_transfer(int fd, uint16_t *rx, size_t len, int dump_flag) {
+static void slave_transfer(int fd, uint16_t *rx, uint16_t *tx, size_t len, int dump_flag) {
     int ret;
+
+    // 수신한 데이터를 슬레이브가 그대로 에코함
     struct spi_ioc_transfer tr = {
-        .tx_buf = 0,  // 처음에는 송신할 데이터가 없으므로 NULL로 설정
-        .rx_buf = (unsigned long)rx,
+        .tx_buf = (unsigned long)rx,
+        .rx_buf = (unsigned long)tx,
         .len = len,
         .delay_usecs = delay,
         .speed_hz = speed,
         .bits_per_word = bits,
     };
 
-    // 먼저 데이터를 수신
     ret = ioctl(fd, SPI_IOC_MESSAGE(1), &tr);
-    if (ret < 1) {
-        pabort("can't receive spi message");
-    }
+    if (ret < 1)
+        pabort("can't send spi message");
 
     if (dump_flag) {
         hex_dump(rx, len, 16, "RX (received)");
-    }
-
-    // 수신된 데이터를 다시 전송 (에코)
-    struct spi_ioc_transfer tr_echo = {
-        .tx_buf = (unsigned long)rx,  // RX 버퍼의 데이터를 TX로 전송
-        .rx_buf = 0,                  // 에코 전송이므로 수신할 데이터는 필요 없음
-        .len = len,
-        .delay_usecs = delay,
-        .speed_hz = speed,
-        .bits_per_word = bits,
-    };
-
-    ret = ioctl(fd, SPI_IOC_MESSAGE(1), &tr_echo);
-    if (ret < 1) {
-        pabort("can't send spi echo message");
-    }
-
-    if (dump_flag) {
         hex_dump(rx, len, 16, "TX (echo)");
     }
 }
@@ -341,7 +288,7 @@ int main(int argc, char *argv[])
 
     if (spislave) {
         printf("SPI SLAVE TEST %d bytes one Shot ^^ \n", data_size);
-        slave_transfer(fd, (uint16_t *)rx, data_size, 1);
+        slave_transfer(fd, (uint16_t *)rx, (uint16_t *)tx, data_size, 1);
     } else {
         printf("SPI MASTER TEST START %d time \n", testCount);
         for (i = 0; i < testCount; i++) {
@@ -354,20 +301,20 @@ int main(int argc, char *argv[])
                 if (rx[j] != tx[j]) {
                     printf("Err: num %d [Sent: %x] [Received: %x] \n", j, tx[j], rx[j]);
                     flag = 1;
+                    break;
                 }
             }
             if (!flag) {
                 printf("SPI Read OK\n");
             } else {
                 printf("SPI Read FAIL\n");
-                // 송신한 데이터와 수신한 데이터 전체를 출력
                 printf("Sent data:\n");
                 hex_dump(tx, data_size, 16, "TX");
                 printf("Received data:\n");
                 hex_dump(rx, data_size, 16, "RX");
             }
         }
-        close(fd);
+    close(fd);
     }
 
     free(tx);
