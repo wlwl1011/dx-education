@@ -114,10 +114,10 @@ static void transfer(int fd, uint16_t const *tx, uint16_t const *rx, size_t len,
     }
 }
 
-static void slave_transfer(int fd, uint16_t const *tx, uint16_t *rx, size_t len, int dump_flag) {
+static void slave_transfer(int fd, uint16_t *rx, size_t len, int dump_flag) {
     int ret;
     struct spi_ioc_transfer tr = {
-        .tx_buf = (unsigned long)tx,
+        .tx_buf = 0,  // 처음에는 송신할 데이터가 없으므로 NULL로 설정
         .rx_buf = (unsigned long)rx,
         .len = len,
         .delay_usecs = delay,
@@ -125,45 +125,29 @@ static void slave_transfer(int fd, uint16_t const *tx, uint16_t *rx, size_t len,
         .bits_per_word = bits,
     };
 
-    if (mode & SPI_TX_QUAD)
-        tr.tx_nbits = 4;
-    else if (mode & SPI_TX_DUAL)
-        tr.tx_nbits = 2;
-    if (mode & SPI_RX_QUAD)
-        tr.rx_nbits = 4;
-    else if (mode & SPI_RX_DUAL)
-        tr.rx_nbits = 2;
-    if (!(mode & SPI_LOOP)) {
-        if (mode & (SPI_TX_QUAD | SPI_TX_DUAL))
-            tr.rx_buf = 0;
-        else if (mode & (SPI_RX_QUAD | SPI_RX_DUAL))
-            tr.tx_buf = 0;
-    }
-
     ret = ioctl(fd, SPI_IOC_MESSAGE(1), &tr);
-    if (ret < 1)
-        pabort("can't send spi message");
+    if (ret < 1) {
+        pabort("can't receive spi message");
+    }
 
     if (dump_flag) {
-        if (verbose)
-            hex_dump(tx, len, 16, "TX");
-        hex_dump(rx, len, 16, "RX");
+        hex_dump(rx, len, 16, "RX (received)");
     }
 
-    // Check if there is valid data in the RX buffer
+    // 유효한 데이터가 있는지 확인
     int valid_data = 0;
     for (size_t i = 0; i < len / sizeof(uint16_t); i++) {
-        if (rx[i] != 0) {
+        if (rx[i] != 0) {  // 유효한 데이터가 있는지 확인
             valid_data = 1;
             break;
         }
     }
 
-    // If valid data is received, echo it back
+    // 유효한 데이터가 있으면 그 데이터를 에코로 전송
     if (valid_data) {
         struct spi_ioc_transfer tr_echo = {
-            .tx_buf = (unsigned long)rx,
-            .rx_buf = (unsigned long)tx,
+            .tx_buf = (unsigned long)rx,  // RX 버퍼의 데이터를 TX로 전송
+            .rx_buf = 0,                  // 에코 전송이므로 수신할 데이터는 필요 없음
             .len = len,
             .delay_usecs = delay,
             .speed_hz = speed,
@@ -171,13 +155,12 @@ static void slave_transfer(int fd, uint16_t const *tx, uint16_t *rx, size_t len,
         };
 
         ret = ioctl(fd, SPI_IOC_MESSAGE(1), &tr_echo);
-        if (ret < 1)
-            pabort("can't send spi message");
+        if (ret < 1) {
+            pabort("can't send spi echo message");
+        }
 
         if (dump_flag) {
-            if (verbose)
-                hex_dump(rx, len, 16, "TX (echo)");
-            hex_dump(tx, len, 16, "RX (echo)");
+            hex_dump(rx, len, 16, "TX (echo)");
         }
     }
 }
@@ -380,78 +363,27 @@ int main(int argc, char *argv[])
             int flag = 0;
             for (int j = 0; j < data_size / 2; j++) {
                 if (rx[j] != tx[j]) {
-                    printf("Err: num %d [%x][%x] \n", j, rx[j], tx[j]);
+                    printf("Err: num %d [Sent: %x] [Received: %x] \n", j, tx[j], rx[j]);
                     flag = 1;
-                    break;
                 }
             }
             if (!flag) {
                 printf("SPI Read OK\n");
             } else {
                 printf("SPI Read FAIL\n");
+                // 송신한 데이터와 수신한 데이터 전체를 출력
+                printf("Sent data:\n");
+                hex_dump(tx, data_size, 16, "TX");
+                printf("Received data:\n");
+                hex_dump(rx, data_size, 16, "RX");
             }
         }
     close(fd);
 	}
 
-    
     free(tx);
     free(rx);
     printf("SPI TEST END \n");
 
     return ret;
 }
-
-SPI Read OK                                                                                                                                            
-SPI TEST END                                                                                                                                           
-root@dq1:~# [ 1475.905383] INFO: task spidev_test:697 blocked for more than 61 seconds.                                                                
-[ 1475.912125]       Tainted: G           O      5.15.160-b0-saturn #1                                                                                 
-[ 1475.918407] "echo 0 > /proc/sys/kernel/hung_task_timeout_secs" disables this message.                                                               
-[ 1475.926246] task:spidev_test     state:D stack:    0 pid:  697 ppid:   382 flags:0x00000204                                                         
-[ 1475.934617] Call trace:                                                                                                                             
-[ 1475.937057]  __switch_to+0xf4/0x13c                                                                                                                 
-[ 1475.940570]  __schedule+0x360/0x854                                                                                                                 
-[ 1475.944072]  schedule+0x6c/0x13c                                                                                                                    
-[ 1475.947310]  schedule_timeout+0xf0/0x1ac                                                                                                            
-[ 1475.951246]  wait_for_completion+0x84/0x120                                                                                                         
-[ 1475.955440]  __spi_sync+0x168/0x310                                                                                                                 
-[ 1475.958942]  spi_sync+0x30/0x5c                                                                                                                     
-[ 1475.962093]  spidev_message+0x3c0/0x584                                                                                                             
-[ 1475.965939]  spidev_ioctl+0xae0/0xda0                                                                                                               
-[ 1475.969611]  __arm64_sys_ioctl+0x5e4/0x1580                                                                                                         
-[ 1475.973807]  invoke_syscall.constprop.0+0x5c/0x110                                                                                                  
-[ 1475.978612]  do_el0_svc+0x144/0x160                                                                                                                 
-[ 1475.982112]  el0_svc+0x28/0xc0                                                                                                                      
-[ 1475.985166]  el0t_64_sync_handler+0xa4/0x130                                                                                                        
-[ 1475.989447]  el0t_64_sync+0x1a4/0x1a8                                                                                                               
-[ 1475.993111] Kernel panic - not syncing: hung_task: blocked tasks                                                                                    
-[ 1475.999112] CPU: 2 PID: 42 Comm: khungtaskd Tainted: G           O      5.15.160-b0-saturn #1                                                       
-[ 1476.007634] Hardware name: LG Electronics, Intelligent SoC DQ1 (AArch64) Airsol-CoreBoard (DT)                                                      
-[ 1476.016237] Call trace:                                                                                                                             
-[ 1476.018674]  dump_backtrace+0x0/0x1cc                                                                                                               
-[ 1476.022336]  show_stack+0x18/0x24                                                                                                                   
-[ 1476.025649]  dump_stack_lvl+0x7c/0xa0                                                                                                               
-[ 1476.029311]  dump_stack+0x18/0x34                                                                                                                   
-[ 1476.032623]  panic+0x17c/0x3c4                                                                                                                      
-[ 1476.035674]  watchdog+0x2e0/0x4cc                                                                                                                   
-[ 1476.038988]  kthread+0x154/0x160                                                                                                                    
-[ 1476.042216]  ret_from_fork+0x10/0x20                                                                                                                
-[ 1476.045882] SMP: stopping secondary CPUs                                                                                                            
-[ 1476.049913] dq1-panic: dq1_panic_handler CPU #2                                                                                                     
-[ 1476.054541] Kernel Offset: disabled                                                                                                                 
-[ 1476.058023] CPU features: 0x0,00000000,00000842                                                                                                     
-[ 1476.062550] Memory Limit: none                                                                                                                      
-[ 1476.074982] Rebooting in 5 seconds..                                                                                                                
-DQ1 CPBL                                                                                                                                               
-Boot CLK : OSC_CLK                                                                                                                                     
-Boot device : eMMC                                                                                                                                     
-Boot mode : Normal                                                                                                                                     
-eMMC Boot mode                                                                                                                                         
-DM                                                                                                                                                     
-DQ1 CSBL_b0-nextacp-Ver1.6.0(f05b1a5)                                                                                                                  
-Debug mode                                                                                                                                             
-Supported config: RAMDUMP USB1, DDR X32/924MHz                                                                                                         
-Reason Panic                                                                                                                                           
-RamDump  CSBL                                                                                                                                          
-usb ramdump driver init (usb1)                                                                                                                         
-USB Connected        
