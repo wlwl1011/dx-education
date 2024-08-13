@@ -6,7 +6,6 @@
 #include <getopt.h>
 #include <fcntl.h>
 #include <sys/ioctl.h>
-#include <sys/time.h>
 #include <linux/types.h>
 #include <linux/spi/spidev.h>
 
@@ -290,7 +289,7 @@ int main(int argc, char *argv[])
     int ret = 0;
     int i = 0;
     int fd;
-	int testCount = 1;
+    int testCount = 1;
     uint8_t *tx;
     uint8_t *rx;
 
@@ -368,8 +367,8 @@ int main(int argc, char *argv[])
                 hex_dump(rx, data_size, 16, "RX");
             }
         }
-    close(fd);
-	}
+        close(fd);
+    }
 
     free(tx);
     free(rx);
