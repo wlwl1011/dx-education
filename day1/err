@@ -1,5 +1,5 @@
 root@dq1:~# ./spidev_test -D /dev/spidev1.0 -S -v &                                                                                                             
-[1] 455                                                                                                                                                         
+[1] 413                                                                                                                                                         
 max speed: 25000000 Hz (25000 KHz)                                                                                                                              
 SPI SLAVE TEST 256 bytes one Shot ^^                                                                                                                            
 root@dq1:~# ./spidev_test -D /dev/spidev4.0 -v                                                                                                                  
@@ -7,183 +7,74 @@ max speed: 25000000 Hz (25000 KHz)
 SPI MASTER TEST START 1 time                                                                                                                                    
 SPI MASTER TEST 256 bytes data transfer                                                                                                                         
 TX | 00 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F  | ................                                                                                        
-RX (received) | 00 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F  | ................                                                                             
 TX | 10 11 12 13 14 15 16 17 18 19 1A 1B 1C 1D 1E 1F  | ................                                                                                        
-RX (received) | 10 11 12 13 14 15 16 17 18 19 1A 1B 1C 1D 1E 1F  | ................                                                                             
+RX (received) | 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  | ................                                                                             
 TX | 20 21 22 23 24 25 26 27 28 29 2A 2B 2C 2D 2E 2F  | .!"#$%&'()*+,-./                                                                                        
-RX (received) | 20 21 22 23 24 25 26 27 28 29 2A 2B 2C 2D 2E 2F  | .!"#$%&'()*+,-./                                                                             
+RX (received) | 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  | ................                                                                             
 TX | 30 31 32 33 34 35 36 37 38 39 3A 3B 3C 3D 3E 3F  | 0123456789:;<=>?                                                                                        
-RX (received) | 30 31 32 33 34 35 36 37 38 39 3A 3B 3C 3D 3E 3F  | 0123456789:;<=>?                                                                             
+RX (received) | 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  | ................                                                                             
 TX | 40 41 42 43 44 45 46 47 48 49 4A 4B 4C 4D 4E 4F  | @ABCDEFGHIJKLMNO                                                                                        
-RX (received) | 40 41 42 43 44 45 46 47 48 49 4A 4B 4C 4D 4E 4F  | @ABCDEFGHIJKLMNO                                                                             
+RX (received) | 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  | ................                                                                             
 TX | 50 51 52 53 54 55 56 57 58 59 5A 5B 5C 5D 5E 5F  | PQRSTUVWXYZ[\]^_                                                                                        
-RX (received) | 50 51 52 53 54 55 56 57 58 59 5A 5B 5C 5D 5E 5F  | PQRSTUVWXYZ[\]^_                                                                             
+RX (received) | 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  | ................                                                                             
 TX | 60 61 62 63 64 65 66 67 68 69 6A 6B 6C 6D 6E 6F  | `abcdefghijklmno                                                                                        
-RX (received) | 60 61 62 63 64 65 66 67 68 69 6A 6B 6C 6D 6E 6F  | `abcdefghijklmno                                                                             
+RX (received) | 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  | ................                                                                             
 TX | 70 71 72 73 74 75 76 77 78 79 7A 7B 7C 7D 7E 7F  | pqrstuvwxyz{|}~                                                                                         
-RX (received) | 70 71 72 73 74 75 76 77 78 79 7A 7B 7C 7D 7E 7F  | pqrstuvwxyz{|}~                                                                              
+RX (received) | 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  | ................                                                                             
 TX | 80 81 82 83 84 85 86 87 88 89 8A 8B 8C 8D 8E 8F  | ����������������                                                                                        
-RX (received) | 80 81 82 83 84 85 86 87 88 89 8A 8B 8C 8D 8E 8F  | ����������������                                                                             
+RX (received) | 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  | ................                                                                             
 TX | 90 91 92 93 94 95 96 97 98 99 9A 9B 9C 9D 9E 9F  | ��������������                                                                                          
-RX (received) | 90 91 92 93 94 95 96 97 98 99 9A 9B 9C 9D 9E 9F  | ��������������                                                                               
+RX (received) | 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  | ................                                                                             
 TX | A0 A1 A2 A3 A4 A5 A6 A7 A8 A9 AA AB AC AD AE AF  | ����������������                                                                                        
-RX (received) | A0 A1 A2 A3 A4 A5 A6 A7 A8 A9 AA AB AC AD AE AF  | ����������������                                                                             
+RX (received) | 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  | ................                                                                             
 TX | B0 B1 B2 B3 B4 B5 B6 B7 B8 B9 BA BB BC BD BE BF  | ����������������                                                                                        
-RX (received) | B0 B1 B2 B3 B4 B5 B6 B7 B8 B9 BA BB BC BD BE BF  | ����������������                                                                             
+RX (received) | 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  | ................                                                                             
 TX | C0 C1 C2 C3 C4 C5 C6 C7 C8 C9 CA CB CC CD CE CF  | ����������������                                                                                        
-RX (received) | C0 C1 C2 C3 C4 C5 C6 C7 C8 C9 CA CB CC CD CE CF  | ����������������                                                                             
+RX (received) | 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  | ................                                                                             
 TX | D0 D1 D2 D3 D4 D5 D6 D7 D8 D9 DA DB DC DD DE DF  | ����������������                                                                                        
-RX (received) | D0 D1 D2 D3 D4 D5 D6 D7 D8 D9 DA DB DC DD DE DF  | ����������������                                                                             
+RX (received) | 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  | ................                                                                             
 TX | E0 E1 E2 E3 E4 E5 E6 E7 E8 E9 EA EB EC ED EE EF  | ����������������                                                                                        
-RX (received) | E0 E1 E2 E3 E4 E5 E6 E7 E8 E9 EA EB EC ED EE EF  | ����������������                                                                             
+RX (received) | 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  | ................                                                                             
 TX | F0 F1 F2 F3 F4 F5 F6 F7 F8 F9 FA FB FC FD FE FF  | ���������������.                                                                                        
-RX (received) | F0 F1 F2 F3 F4 F5 F6 F7 F8 F9 FA FB FC FD FE FF  | ���������������.                                                                             
+RX (received) | 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  | ................                                                                             
 RX | 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  | ................                                                                                        
+RX (received) | 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  | ................                                                                             
 RX | 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  | ................                                                                                        
+TX (echo) | 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  | ................                                                                                 
 RX | 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  | ................                                                                                        
+TX (echo) | 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  | ................                                                                                 
 RX | 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  | ................                                                                                        
+TX (echo) | 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  | ................                                                                                 
 RX | 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  | ................                                                                                        
+TX (echo) | 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  | ................                                                                                 
 RX | 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  | ................                                                                                        
+TX (echo) | 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  | ................                                                                                 
 RX | 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  | ................                                                                                        
+TX (echo) | 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  | ................                                                                                 
 RX | 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  | ................                                                                                        
+TX (echo) | 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  | ................                                                                                 
 RX | 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  | ................                                                                                        
+TX (echo) | 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  | ................                                                                                 
 RX | 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  | ................                                                                                        
+TX (echo) | 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  | ................                                                                                 
 RX | 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  | ................                                                                                        
+TX (echo) | 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  | ................                                                                                 
 RX | 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  | ................                                                                                        
+TX (echo) | 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  | ................                                                                                 
 RX | 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  | ................                                                                                        
+TX (echo) | 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  | ................                                                                                 
 RX | 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  | ................                                                                                        
+TX (echo) | 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  | ................                                                                                 
 RX | 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  | ................                                                                                        
+TX (echo) | 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  | ................                                                                                 
 RX | 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  | ................                                                                                        
 Err: num 1 [Sent: 1] [Received: 0]                                                                                                                              
-Err: num 2 [Sent: 2] [Received: 0]                                                                                                                              
-Err: num 3 [Sent: 3] [Received: 0]                                                                                                                              
-Err: num 4 [Sent: 4] [Received: 0]                                                                                                                              
-Err: num 5 [Sent: 5] [Received: 0]                                                                                                                              
-Err: num 6 [Sent: 6] [Received: 0]                                                                                                                              
-Err: num 7 [Sent: 7] [Received: 0]                                                                                                                              
-Err: num 8 [Sent: 8] [Received: 0]                                                                                                                              
-Err: num 9 [Sent: 9] [Received: 0]                                                                                                                              
-Err: num 10 [Sent: a] [Received: 0]                                                                                                                             
-Err: num 11 [Sent: b] [Received: 0]                                                                                                                             
-Err: num 12 [Sent: c] [Received: 0]                                                                                                                             
-Err: num 13 [Sent: d] [Received: 0]                                                                                                                             
-Err: num 14 [Sent: e] [Received: 0]                                                                                                                             
-Err: num 15 [Sent: f] [Received: 0]                                                                                                                             
-Err: num 16 [Sent: 10] [Received: 0]                                                                                                                            
-Err: num 17 [Sent: 11] [Received: 0]                                                                                                                            
-Err: num 18 [Sent: 12] [Received: 0]                                                                                                                            
-Err: num 19 [Sent: 13] [Received: 0]                                                                                                                            
-Err: num 20 [Sent: 14] [Received: 0]                                                                                                                            
-Err: num 21 [Sent: 15] [Received: 0]                                                                                                                            
-Err: num 22 [Sent: 16] [Received: 0]                                                                                                                            
-Err: num 23 [Sent: 17] [Received: 0]                                                                                                                            
-Err: num 24 [Sent: 18] [Received: 0]                                                                                                                            
-Err: num 25 [Sent: 19] [Received: 0]                                                                                                                            
-Err: num 26 [Sent: 1a] [Received: 0]                                                                                                                            
-Err: num 27 [Sent: 1b] [Received: 0]                                                                                                                            
-Err: num 28 [Sent: 1c] [Received: 0]                                                                                                                            
-Err: num 29 [Sent: 1d] [Received: 0]                                                                                                                            
-Err: num 30 [Sent: 1e] [Received: 0]                                                                                                                            
-Err: num 31 [Sent: 1f] [Received: 0]                                                                                                                            
-Err: num 32 [Sent: 20] [Received: 0]                                                                                                                            
-Err: num 33 [Sent: 21] [Received: 0]                                                                                                                            
-Err: num 34 [Sent: 22] [Received: 0]                                                                                                                            
-Err: num 35 [Sent: 23] [Received: 0]                                                                                                                            
-Err: num 36 [Sent: 24] [Received: 0]                                                                                                                            
-Err: num 37 [Sent: 25] [Received: 0]                                                                                                                            
-Err: num 38 [Sent: 26] [Received: 0]                                                                                                                            
-Err: num 39 [Sent: 27] [Received: 0]                                                                                                                            
-Err: num 40 [Sent: 28] [Received: 0]                                                                                                                            
-Err: num 41 [Sent: 29] [Received: 0]                                                                                                                            
-Err: num 42 [Sent: 2a] [Received: 0]                                                                                                                            
-Err: num 43 [Sent: 2b] [Received: 0]                                                                                                                            
-Err: num 44 [Sent: 2c] [Received: 0]                                                                                                                            
-Err: num 45 [Sent: 2d] [Received: 0]                                                                                                                            
-Err: num 46 [Sent: 2e] [Received: 0]                                                                                                                            
-Err: num 47 [Sent: 2f] [Received: 0]                                                                                                                            
-Err: num 48 [Sent: 30] [Received: 0]                                                                                                                            
-Err: num 49 [Sent: 31] [Received: 0]                                                                                                                            
-Err: num 50 [Sent: 32] [Received: 0]                                                                                                                            
-Err: num 51 [Sent: 33] [Received: 0]                                                                                                                            
-Err: num 52 [Sent: 34] [Received: 0]                                                                                                                            
-Err: num 53 [Sent: 35] [Received: 0]                                                                                                                            
-Err: num 54 [Sent: 36] [Received: 0]                                                                                                                            
-Err: num 55 [Sent: 37] [Received: 0]                                                                                                                            
-Err: num 56 [Sent: 38] [Received: 0]                                                                                                                            
-Err: num 57 [Sent: 39] [Received: 0]                                                                                                                            
-Err: num 58 [Sent: 3a] [Received: 0]                                                                                                                            
-Err: num 59 [Sent: 3b] [Received: 0]                                                                                                                            
-Err: num 60 [Sent: 3c] [Received: 0]                                                                                                                            
-Err: num 61 [Sent: 3d] [Received: 0]                                                                                                                            
-Err: num 62 [Sent: 3e] [Received: 0]                                                                                                                            
-Err: num 63 [Sent: 3f] [Received: 0]                                                                                                                            
-Err: num 64 [Sent: 40] [Received: 0]                                                                                                                            
-Err: num 65 [Sent: 41] [Received: 0]                                                                                                                            
-Err: num 66 [Sent: 42] [Received: 0]                                                                                                                            
-Err: num 67 [Sent: 43] [Received: 0]                                                                                                                            
-Err: num 68 [Sent: 44] [Received: 0]                                                                                                                            
-Err: num 69 [Sent: 45] [Received: 0]                                                                                                                            
-Err: num 70 [Sent: 46] [Received: 0]                                                                                                                            
-Err: num 71 [Sent: 47] [Received: 0]                                                                                                                            
-Err: num 72 [Sent: 48] [Received: 0]                                                                                                                            
-Err: num 73 [Sent: 49] [Received: 0]                                                                                                                            
-Err: num 74 [Sent: 4a] [Received: 0]                                                                                                                            
-Err: num 75 [Sent: 4b] [Received: 0]                                                                                                                            
-Err: num 76 [Sent: 4c] [Received: 0]                                                                                                                            
-Err: num 77 [Sent: 4d] [Received: 0]                                                                                                                            
-Err: num 78 [Sent: 4e] [Received: 0]                                                                                                                            
-Err: num 79 [Sent: 4f] [Received: 0]                                                                                                                            
-Err: num 80 [Sent: 50] [Received: 0]                                                                                                                            
-Err: num 81 [Sent: 51] [Received: 0]                                                                                                                            
-Err: num 82 [Sent: 52] [Received: 0]                                                                                                                            
-Err: num 83 [Sent: 53] [Received: 0]                                                                                                                            
-Err: num 84 [Sent: 54] [Received: 0]                                                                                                                            
-Err: num 85 [Sent: 55] [Received: 0]                                                                                                                            
-Err: num 86 [Sent: 56] [Received: 0]                                                                                                                            
-Err: num 87 [Sent: 57] [Received: 0]                                                                                                                            
-Err: num 88 [Sent: 58] [Received: 0]                                                                                                                            
-Err: num 89 [Sent: 59] [Received: 0]                                                                                                                            
-Err: num 90 [Sent: 5a] [Received: 0]                                                                                                                            
-Err: num 91 [Sent: 5b] [Received: 0]                                                                                                                            
-Err: num 92 [Sent: 5c] [Received: 0]                                                                                                                            
-Err: num 93 [Sent: 5d] [Received: 0]                                                                                                                            
-Err: num 94 [Sent: 5e] [Received: 0]                                                                                                                            
-Err: num 95 [Sent: 5f] [Received: 0]                                                                                                                            
-Err: num 96 [Sent: 60] [Received: 0]                                                                                                                            
-Err: num 97 [Sent: 61] [Received: 0]                                                                                                                            
-Err: num 98 [Sent: 62] [Received: 0]                                                                                                                            
-Err: num 99 [Sent: 63] [Received: 0]                                                                                                                            
-Err: num 100 [Sent: 64] [Received: 0]                                                                                                                           
-Err: num 101 [Sent: 65] [Received: 0]                                                                                                                           
-Err: num 102 [Sent: 66] [Received: 0]                                                                                                                           
-Err: num 103 [Sent: 67] [Received: 0]                                                                                                                           
-Err: num 104 [Sent: 68] [Received: 0]                                                                                                                           
-Err: num 105 [Sent: 69] [Received: 0]                                                                                                                           
-Err: num 106 [Sent: 6a] [Received: 0]                                                                                                                           
-Err: num 107 [Sent: 6b] [Received: 0]                                                                                                                           
-Err: num 108 [Sent: 6c] [Received: 0]                                                                                                                           
-Err: num 109 [Sent: 6d] [Received: 0]                                                                                                                           
-Err: num 110 [Sent: 6e] [Received: 0]                                                                                                                           
-Err: num 111 [Sent: 6f] [Received: 0]                                                                                                                           
-Err: num 112 [Sent: 70] [Received: 0]                                                                                                                           
-Err: num 113 [Sent: 71] [Received: 0]                                                                                                                           
-Err: num 114 [Sent: 72] [Received: 0]                                                                                                                           
-Err: num 115 [Sent: 73] [Received: 0]                                                                                                                           
-Err: num 116 [Sent: 74] [Received: 0]                                                                                                                           
-Err: num 117 [Sent: 75] [Received: 0]                                                                                                                           
-Err: num 118 [Sent: 76] [Received: 0]                                                                                                                           
-Err: num 119 [Sent: 77] [Received: 0]                                                                                                                           
-Err: num 120 [Sent: 78] [Received: 0]                                                                                                                           
-Err: num 121 [Sent: 79] [Received: 0]                                                                                                                           
-Err: num 122 [Sent: 7a] [Received: 0]                                                                                                                           
-Err: num 123 [Sent: 7b] [Received: 0]                                                                                                                           
-Err: num 124 [Sent: 7c] [Received: 0]                                                                                                                           
-Err: num 125 [Sent: 7d] [Received: 0]                                                                                                                           
-Err: num 126 [Sent: 7e] [Received: 0]                                                                                                                           
-Err: num 127 [Sent: 7f] [Received: 0]                                                                                                                           
+TX (echo) | 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  | ................                                                                                 
 SPI Read FAIL                                                                                                                                                   
 Sent data:                                                                                                                                                      
+TX (echo) | 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  | ................                                                                                 
 TX | 00 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F  | ................                                                                                        
+SPI TEST END                                                                                                                                                    
 TX | 10 11 12 13 14 15 16 17 18 19 1A 1B 1C 1D 1E 1F  | ................                                                                                        
 TX | 20 21 22 23 24 25 26 27 28 29 2A 2B 2C 2D 2E 2F  | .!"#$%&'()*+,-./                                                                                        
 TX | 30 31 32 33 34 35 36 37 38 39 3A 3B 3C 3D 3E 3F  | 0123456789:;<=>?                                                                                        
@@ -217,55 +108,4 @@ RX | 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  | ................
 RX | 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  | ................                                                                                        
 RX | 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  | ................                                                                                        
 SPI TEST END                                                                                                                                                    
-root@dq1:~# [  431.425523] INFO: task spidev_test:455 blocked for more than 61 seconds.                                                                         
-[  431.432264]       Tainted: G           O      5.15.160-b0-saturn #1                                                                                          
-[  431.438547] "echo 0 > /proc/sys/kernel/hung_task_timeout_secs" disables this message.                                                                        
-[  431.446384] task:spidev_test     state:D stack:    0 pid:  455 ppid:   380 flags:0x00000204                                                                  
-[  431.454754] Call trace:                                                                                                                                      
-[  431.457194]  __switch_to+0xf4/0x13c                                                                                                                          
-[  431.460704]  __schedule+0x360/0x854                                                                                                                          
-[  431.464206]  schedule+0x6c/0x13c                                                                                                                             
-[  431.467443]  schedule_timeout+0xf0/0x1ac                                                                                                                     
-[  431.471378]  wait_for_completion+0x84/0x120                                                                                                                  
-[  431.475570]  __spi_sync+0x168/0x310                                                                                                                          
-[  431.479072]  spi_sync+0x30/0x5c                                                                                                                              
-[  431.482221]  spidev_message+0x3c0/0x584                                                                                                                      
-[  431.486067]  spidev_ioctl+0xae0/0xda0                                                                                                                        
-[  431.489738]  __arm64_sys_ioctl+0x5e4/0x1580                                                                                                                  
-[  431.493934]  invoke_syscall.constprop.0+0x5c/0x110                                                                                                           
-[  431.498736]  do_el0_svc+0x144/0x160                                                                                                                          
-[  431.502236]  el0_svc+0x28/0xc0                                                                                                                               
-[  431.505291]  el0t_64_sync_handler+0xa4/0x130                                                                                                                 
-[  431.509573]  el0t_64_sync+0x1a4/0x1a8                                                                                                                        
-[  431.513238] Kernel panic - not syncing: hung_task: blocked tasks                                                                                             
-[  431.519239] CPU: 2 PID: 42 Comm: khungtaskd Tainted: G           O      5.15.160-b0-saturn #1                                                                
-[  431.527759] Hardware name: LG Electronics, Intelligent SoC DQ1 (AArch64) Airsol-CoreBoard (DT)                                                               
-[  431.536362] Call trace:                                                                                                                                      
-[  431.538800]  dump_backtrace+0x0/0x1cc                                                                                                                        
-[  431.542462]  show_stack+0x18/0x24                                                                                                                            
-[  431.545774]  dump_stack_lvl+0x7c/0xa0                                                                                                                        
-[  431.549437]  dump_stack+0x18/0x34                                                                                                                            
-[  431.552748]  panic+0x17c/0x3c4                                                                                                                               
-[  431.555800]  watchdog+0x2e0/0x4cc                                                                                                                            
-[  431.559113]  kthread+0x154/0x160                                                                                                                             
-[  431.562341]  ret_from_fork+0x10/0x20                                                                                                                         
-[  431.566022] SMP: stopping secondary CPUs                                                                                                                     
-[  431.570049] dq1-panic: dq1_panic_handler CPU #2                                                                                                              
-[  431.574676] Kernel Offset: disabled                                                                                                                          
-[  431.578159] CPU features: 0x0,00000000,00000842                                                                                                              
-[  431.582687] Memory Limit: none                                                                                                                               
-[  431.594859] Rebooting in 5 seconds..                                                                                                                         
-DQ1 CPBL                                                                                                                                                        
-Boot CLK : OSC_CLK                                                                                                                                              
-Boot device : eMMC                                                                                                                                              
-Boot mode : Normal                                                                                                                                              
-eMMC Boot mode                                                                                                                                                  
-DM                                                                                                                                                              
-DQ1 CSBL_b0-nextacp-Ver1.6.0(f05b1a5)                                                                                                                           
-Debug mode                                                                                                                                                      
-Supported config: RAMDUMP USB1, DDR X32/924MHz                                                                                                                  
-Reason Panic                                                                                                                                                    
-RamDump  CSBL                                                                                                                                                   
-usb ramdump driver init (usb1)                                                                                                                                  
-USB Connected                                                                                                                                                   
-
+[1]+  Done                    ./spidev_test -D /dev/spidev1.0 -S -v     
