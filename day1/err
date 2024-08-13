@@ -8,6 +8,7 @@
 #include <sys/ioctl.h>
 #include <linux/types.h>
 #include <linux/spi/spidev.h>
+#include <poll.h>
 
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
 #define DEFAULT_DATA_SIZE (256)
@@ -262,21 +263,33 @@ int main(int argc, char *argv[])
     printf("max speed: %d Hz (%d KHz) \n", speed, speed / 1000);
 
     if (spislave) {
+        struct pollfd pfd;
+        pfd.fd = fd;
+        pfd.events = POLLIN;
+
         printf("SPI SLAVE READY, waiting for master...\n");
+
         while (1) {
-            ret = read(fd, rx, data_size);
+            // 마스터의 요청이 올 때까지 대기
+            ret = poll(&pfd, 1, -1);
             if (ret < 0)
-                pabort("Failed to read data from SPI");
+                pabort("poll() failed");
 
-            printf("Received data on slave:\n");
-            hex_dump(rx, data_size, 16, "RX");
+            if (pfd.revents & POLLIN) {
+                ret = read(fd, rx, data_size);
+                if (ret < 0)
+                    pabort("Failed to read data from SPI");
 
-            ret = write(fd, rx, data_size);
-            if (ret < 0)
-                pabort("Failed to write data to SPI");
+                printf("Received data on slave:\n");
+                hex_dump(rx, data_size, 16, "RX");
 
-            printf("Sent data back from slave:\n");
-            hex_dump(rx, data_size, 16, "TX");
+                ret = write(fd, rx, data_size);
+                if (ret < 0)
+                    pabort("Failed to write data to SPI");
+
+                printf("Sent data back from slave:\n");
+                hex_dump(rx, data_size, 16, "TX");
+            }
         }
     } else {
         printf("SPI MASTER TEST START\n");
