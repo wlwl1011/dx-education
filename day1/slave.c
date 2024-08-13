@@ -8,6 +8,7 @@
 #include <sys/ioctl.h>
 #include <linux/types.h>
 #include <linux/spi/spidev.h>
+#include <poll.h>
 
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
 #define DEFAULT_DATA_SIZE (256)
@@ -206,89 +207,81 @@ static void parse_opts(int argc, char *argv[])
     }
 }
 
-#define DATA_EA (1)		//(100000)
+int main(int argc, char *argv[]) {
+    int ret = 0;
+    int fd;
+    uint8_t *tx;
+    uint8_t *rx;
 
-int main(int argc, char *argv[])
-{
-	int ret = 0;
+    parse_opts(argc, argv);
+    mode = SPI_MODE_3;
 
-		int i = 0;
-		int fd;
-		int testCount = 1;
-		uint8_t *tx;
-		uint8_t *rx;
+    tx = malloc(DEFAULT_DATA_SIZE);
+    rx = malloc(DEFAULT_DATA_SIZE);
 
-		parse_opts(argc, argv);
-		mode = SPI_MODE_3;
+    if (tx == NULL || rx == NULL) {
+        pabort("Failed to allocate memory for buffers");
+    }
 
-		tx = malloc(data_size);
-		rx = malloc(data_size);
+    // 데이터 버퍼 초기화
+    for (int i = 0; i < DEFAULT_DATA_SIZE; i++) {
+        tx[i] = i % 256;
+        rx[i] = 0;
+    }
 
-		if (tx == NULL || rx == NULL) {
-			pabort("Failed to allocate memory for buffers");
-		}
+    fd = open(device, O_RDWR | O_NONBLOCK);  // 비동기 모드로 열기
+    if (fd < 0)
+        pabort("can't open device");
 
-		// 데이터 버퍼 초기화 (예시로 패턴 생성)
-		for (i = 0; i < data_size; i++) {
-			tx[i] = i % 256;
-			rx[i] = 0;
-		}
+    ret = ioctl(fd, SPI_IOC_WR_MODE32, &mode);
+    if (ret == -1)
+        pabort("can't set spi mode");
 
-		fd = open(device, O_RDWR);
-		if (fd < 0)
-			pabort("can't open device");
+    ret = ioctl(fd, SPI_IOC_WR_BITS_PER_WORD, &bits);
+    if (ret == -1)
+        pabort("can't set bits per word");
 
-		ret = ioctl(fd, SPI_IOC_WR_MODE32, &mode);
-		if (ret == -1)
-			pabort("can't set spi mode");
+    ret = ioctl(fd, SPI_IOC_WR_MAX_SPEED_HZ, &speed);
+    if (ret == -1)
+        pabort("can't set max speed hz");
 
-		ret = ioctl(fd, SPI_IOC_RD_MODE32, &mode);
-		if (ret == -1)
-			pabort("can't get spi mode");
+    struct pollfd fds;
+    fds.fd = fd;
+    fds.events = POLLIN;
 
-		ret = ioctl(fd, SPI_IOC_WR_BITS_PER_WORD, &bits);
-		if (ret == -1)
-			pabort("can't set bits per word");
-
-		ret = ioctl(fd, SPI_IOC_RD_BITS_PER_WORD, &bits);
-		if (ret == -1)
-			pabort("can't get bits per word");
-
-		ret = ioctl(fd, SPI_IOC_WR_MAX_SPEED_HZ, &speed);
-		if (ret == -1)
-			pabort("can't set max speed hz");
-
-		ret = ioctl(fd, SPI_IOC_RD_MAX_SPEED_HZ, &speed);
-		if (ret == -1)
-			pabort("can't get max speed hz");
-
-
-	while(1)
-	{
-		printf("SPI SLAVE TEST %d bytes one Shot ^^ \n", data_size);
+    while (1) {
+        printf("SPI SLAVE TEST %d bytes One Shot ^^ \n", DEFAULT_DATA_SIZE);
         printf("SLAVE ready to receive data\n");
-        ret = read(fd, rx, data_size);
-        if (ret < 0)
-            pabort("Failed to read data from SPI");
-        
-        printf("Received data on slave:\n");
-        hex_dump(rx, data_size, 16, "RX");
 
-        printf("-------------------------------\n");
+        ret = poll(&fds, 1, -1);  // 무한 대기
+        if (ret > 0) {
+            if (fds.revents & POLLIN) {
+                ret = read(fd, rx, DEFAULT_DATA_SIZE);
+                if (ret < 0) {
+                    pabort("Failed to read data from SPI");
+                } else {
+                    printf("Received data on slave:\n");
+                    hex_dump(rx, DEFAULT_DATA_SIZE, 16, "RX");
+                }
+            }
+        } else {
+            pabort("poll error");
+        }
+
+        printf("-----------------------------\n");
         printf("SLAVE ready to send data\n");
 
-        ret = write(fd, rx, data_size);
-        if (ret < 0)
+        ret = write(fd, rx, DEFAULT_DATA_SIZE);
+        if (ret < 0) {
             pabort("Failed to write data to SPI");
-
-        printf("Sent data back from slave:\n");
-        hex_dump(rx, data_size, 16, "TX");
-
-	}
+        } else {
+            printf("Sent data back from slave:\n");
+            hex_dump(rx, DEFAULT_DATA_SIZE, 16, "TX");
+        }
+    }
 
     free(tx);
     free(rx);
-    
 
     return ret;
 }
