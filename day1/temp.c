@@ -1,16 +1,3 @@
-/*
- * SPI testing utility (using spidev driver)
- *
- * Copyright (c) 2007  MontaVista Software, Inc.
- * Copyright (c) 2007  Anton Vorontsov <avorontsov@ru.mvista.com>
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License.
- *
- * Cross-compile with cross-gcc -I/path/to/cross-kernel/include
- */
-
 #include <stdint.h>
 #include <unistd.h>
 #include <stdio.h>
@@ -19,7 +6,6 @@
 #include <getopt.h>
 #include <fcntl.h>
 #include <sys/ioctl.h>
-#include <sys/time.h>
 #include <linux/types.h>
 #include <linux/spi/spidev.h>
 
@@ -36,62 +22,13 @@ static void pabort(const char *s)
 static const char *device = "/dev/spidev4.0";
 static uint32_t mode;
 static uint8_t bits = 16;
-static uint32_t speed =25000000;// 22000000; 	//18750000;//18 750 000;
+static uint32_t speed = 25000000;
 static uint16_t delay;
 static int verbose;
 static int spidev3_0;
 static int spislave;
 int testCount = 1;
 static int data_size = DEFAULT_DATA_SIZE;
-
-
-#if (0)
-uint8_t default_tx[32] = {
-	0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-	0x40, 0x00, 0x00, 0x00, 0x00, 0x95,
-	0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-	0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-	0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-	0xF0, 0x0D
-};
-#endif
-#if (FIFO_DEPTH_DEFINDED == 32)
-uint16_t default_tx[FIFO_DEPTH_DEFINDED] = {
-	0xAAA1, 0xAAA2, 0xAAA3, 0xFF, 0xFF, 0xFF,
-	0x4040, 0x00, 0x00, 0x00, 0x00, 0x0F,
-	0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-	0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-	0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-	0xF0, 0xD0
-};
-#endif
-#if (FIFO_DEPTH_DEFINDED == 16)
-uint16_t default_tx[FIFO_DEPTH_DEFINDED] = {
-	0xAAA1, 0xAAA2, 0xAAA3, 0xFF, 0xFF, 0xFF,
-	0x4040, 0x00, 0x00, 0x00, 0x00, 0x0F,
-	0xFF, 0xFF, 0xFF, 0xD0
-};
-#endif
-
-uint8_t read_eerom_chip_id_tx[] = {
-	0x90, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00,
-};
-
-uint8_t read_bmi120_chip_id_tx[] = {
-	0x80, 0x00,
-};
-
-uint8_t spislave_tx[] = {
-	0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x40, 0x00,
-	0x00, 0x00, 0x00, 0x95,0xFF, 0xFF, 0xFF, 0xFF,
-};
-
-uint16_t default_rx[ARRAY_SIZE(default_tx)] = {0, };
-uint8_t read_eerom_chip_id_rx[ARRAY_SIZE(read_eerom_chip_id_tx)] = {0, };
-uint8_t read_bmi120_chip_id_rx[ARRAY_SIZE(read_bmi120_chip_id_tx)] = {0, };
-uint8_t read_spislave_rx[ARRAY_SIZE(spislave_tx)] = {0, };
-
-char *input_tx;
 
 static void hex_dump(const void *src, size_t length, size_t line_size, char *prefix)
 {
@@ -108,7 +45,7 @@ static void hex_dump(const void *src, size_t length, size_t line_size, char *pre
 				while (i++ % line_size)
 					printf("__ ");
 			}
-			printf(" | ");  /* right close */
+			printf(" | ");
 			while (line < address) {
 				c = *line++;
 				printf("%c", (c < 33 || c == 255) ? 0x2E : c);
@@ -120,72 +57,13 @@ static void hex_dump(const void *src, size_t length, size_t line_size, char *pre
 	}
 }
 
-/*
- *  Unescape - process hexadecimal escape character
- *      converts shell input "\x23" -> 0x23
- */
-static int unescape(char *_dst, char *_src, size_t len)
-{
-	int ret = 0;
-	char *src = _src;
-	char *dst = _dst;
-	unsigned int ch;
-
-	while (*src) {
-		if (*src == '\\' && *(src+1) == 'x') {
-			sscanf(src + 2, "%2x", &ch);
-			src += 4;
-			*dst++ = (unsigned char)ch;
-		} else {
-			*dst++ = *src++;
-		}
-		ret++;
-	}
-	return ret;
-}
-
-static void master_transfer(int fd, uint16_t const *tx, uint16_t const *rx, size_t len, int dump_flag)
+static void master_transfer(int fd, uint8_t const *tx, uint8_t const *rx, size_t len, int dump_flag)
 {
 	int ret;
 
 	printf("master transfer... \n");
 	struct spi_ioc_transfer tr_transfer = {
 		.tx_buf = (unsigned long)tx,
-		.rx_buf = 0,
-		.len = len,
-		.delay_usecs = delay,
-		.speed_hz = speed,
-		.bits_per_word = bits,
-	};
-
-	if (mode & SPI_TX_QUAD)
-		tr_transfer.tx_nbits = 4;
-	else if (mode & SPI_TX_DUAL)
-		tr_transfer.tx_nbits = 2;
-	if (mode & SPI_RX_QUAD)
-		tr_transfer.rx_nbits = 4;
-	else if (mode & SPI_RX_DUAL)
-		tr_transfer.rx_nbits = 2;
-	if (!(mode & SPI_LOOP)) {
-		if (mode & (SPI_TX_QUAD | SPI_TX_DUAL))
-			tr_transfer.rx_buf = 0;
-		else if (mode & (SPI_RX_QUAD | SPI_RX_DUAL))
-			tr_transfer.tx_buf = 0;
-	}
-
-	ret = ioctl(fd, SPI_IOC_MESSAGE(1), &tr_transfer);
-	if (ret < 1)
-		pabort("can't send spi message");
-	// if (len != FIFO_DEPTH_DEFINDED*2)
-	// 	printf("length : %d\n", len);
-	if (dump_flag){
-		hex_dump(tx, len, 64, "TX");
-	}
-
-	printf("master recieved... \n");
-
-	struct spi_ioc_transfer tr_recived = {
-		.tx_buf = 0,
 		.rx_buf = (unsigned long)rx,
 		.len = len,
 		.delay_usecs = delay,
@@ -193,33 +71,16 @@ static void master_transfer(int fd, uint16_t const *tx, uint16_t const *rx, size
 		.bits_per_word = bits,
 	};
 
-	if (mode & SPI_TX_QUAD)
-		tr_recived.tx_nbits = 4;
-	else if (mode & SPI_TX_DUAL)
-		tr_recived.tx_nbits = 2;
-	if (mode & SPI_RX_QUAD)
-		tr_recived.rx_nbits = 4;
-	else if (mode & SPI_RX_DUAL)
-		tr_recived.rx_nbits = 2;
-	if (!(mode & SPI_LOOP)) {
-		if (mode & (SPI_TX_QUAD | SPI_TX_DUAL))
-			tr_recived.rx_buf = 0;
-		else if (mode & (SPI_RX_QUAD | SPI_RX_DUAL))
-			tr_recived.tx_buf = 0;
-	}
-
-	ret = ioctl(fd, SPI_IOC_MESSAGE(1), &tr_recived);
+	ret = ioctl(fd, SPI_IOC_MESSAGE(1), &tr_transfer);
 	if (ret < 1)
 		pabort("can't send spi message");
-	// if (len != FIFO_DEPTH_DEFINDED*2)
-	// 	printf("length : %d\n", len);
-	if (dump_flag){
-		hex_dump(tx, len, 64, "RX");
+	if (dump_flag) {
+		hex_dump(tx, len, 64, "TX");
+		hex_dump(rx, len, 64, "RX");
 	}
 }
 
-
-static void slave_transfer(int fd, uint16_t const *rx, size_t len, int dump_flag)
+static void slave_transfer(int fd, uint8_t *rx, size_t len, int dump_flag)
 {
 	int ret;
 
@@ -234,32 +95,16 @@ static void slave_transfer(int fd, uint16_t const *rx, size_t len, int dump_flag
 		.bits_per_word = bits,
 	};
 
-	if (mode & SPI_TX_QUAD)
-		tr_recieve.tx_nbits = 4;
-	else if (mode & SPI_TX_DUAL)
-		tr_recieve.tx_nbits = 2;
-	if (mode & SPI_RX_QUAD)
-		tr_recieve.rx_nbits = 4;
-	else if (mode & SPI_RX_DUAL)
-		tr_recieve.rx_nbits = 2;
-	if (!(mode & SPI_LOOP)) {
-		if (mode & (SPI_TX_QUAD | SPI_TX_DUAL))
-			tr_recieve.rx_buf = 0;
-		else if (mode & (SPI_RX_QUAD | SPI_RX_DUAL))
-			tr_recieve.tx_buf = 0;
-	}
-
 	ret = ioctl(fd, SPI_IOC_MESSAGE(1), &tr_recieve);
 	if (ret < 1)
-		pabort("can't send spi message");
-	// if (len != FIFO_DEPTH_DEFINDED*2)
-	// 	printf("length : %d\n", len);
-	if (dump_flag){
+		pabort("can't receive spi message");
+	if (dump_flag) {
 		hex_dump(rx, len, 64, "RX");
 	}
 
-	printf("slave transfer... \n");
-	struct spi_ioc_transfer tr_transfer = {
+	printf("slave sending back... \n");
+
+	struct spi_ioc_transfer tr_send = {
 		.tx_buf = (unsigned long)rx,
 		.rx_buf = 0,
 		.len = len,
@@ -268,33 +113,13 @@ static void slave_transfer(int fd, uint16_t const *rx, size_t len, int dump_flag
 		.bits_per_word = bits,
 	};
 
-	if (mode & SPI_TX_QUAD)
-		tr_transfer.tx_nbits = 4;
-	else if (mode & SPI_TX_DUAL)
-		tr_transfer.tx_nbits = 2;
-	if (mode & SPI_RX_QUAD)
-		tr_transfer.rx_nbits = 4;
-	else if (mode & SPI_RX_DUAL)
-		tr_transfer.rx_nbits = 2;
-	if (!(mode & SPI_LOOP)) {
-		if (mode & (SPI_TX_QUAD | SPI_TX_DUAL))
-			tr_transfer.rx_buf = 0;
-		else if (mode & (SPI_RX_QUAD | SPI_RX_DUAL))
-			tr_transfer.tx_buf = 0;
-	}
-
-	ret = ioctl(fd, SPI_IOC_MESSAGE(1), &tr_transfer);
+	ret = ioctl(fd, SPI_IOC_MESSAGE(1), &tr_send);
 	if (ret < 1)
 		pabort("can't send spi message");
-	// if (len != FIFO_DEPTH_DEFINDED*2)
-	// 	printf("length : %d\n", len);
-	if (dump_flag){
-		hex_dump(rx, len, 64, "RX");
+	if (dump_flag) {
+		hex_dump(rx, len, 64, "TX");
 	}
-
-
 }
-
 
 static void print_usage(const char *prog)
 {
@@ -311,7 +136,7 @@ static void print_usage(const char *prog)
 	     "  -3 --3wire    SI/SO signals shared\n"
 	     "  -v --verbose  Verbose (show tx buffer)\n"
 	     "  -i --spidev3.0  dev changed \n"
-	     "  -p            Send data (e.g. \"1234\\xde\\xad\")\n"
+	     "  -p            Data size (1 to 256 bytes)\n"
 	     "  -N --no-cs    no chip select\n"
 	     "  -R --ready    slave pulls low to pause\n"
 	     "  -2 --dual     dual transfer\n"
@@ -423,7 +248,7 @@ static void parse_opts(int argc, char *argv[])
 	}
 }
 
-#define DATA_EA (1)		//(100000)
+#define DATA_EA (1)
 
 int main(int argc, char *argv[])
 {
@@ -432,38 +257,28 @@ int main(int argc, char *argv[])
 	int fd;
 	uint8_t *tx;
 	uint8_t *rx;
-	int size;
 	spidev3_0 = 0;
 
 	parse_opts(argc, argv);
 
 	tx = malloc(data_size);
-    rx = malloc(data_size);
+	rx = malloc(data_size);
 
 	if (tx == NULL || rx == NULL) {
-        pabort("Failed to allocate memory for buffers");
-    }
-	
-	 // 데이터 버퍼 초기화 (예시로 패턴 생성)
-    for (i = 0; i < data_size; i++) {
-        tx[i] = i % 256;
-        rx[i] = 0;
-    }
+		pabort("Failed to allocate memory for buffers");
+	}
 
+	for (i = 0; i < data_size; i++) {
+		tx[i] = i % 256;
+		rx[i] = 0;
+	}
 
 	mode = SPI_MODE_3;
 
-	if (argv[1])
-		testCount = atoi(argv[1]);
-
-#if (1)
 	fd = open(device, O_RDWR);
 	if (fd < 0)
 		pabort("can't open device");
 
-	/*
-	 * spi mode
-	 */
 	ret = ioctl(fd, SPI_IOC_WR_MODE32, &mode);
 	if (ret == -1)
 		pabort("can't set spi mode");
@@ -472,11 +287,6 @@ int main(int argc, char *argv[])
 	if (ret == -1)
 		pabort("can't get spi mode");
 
-//	printf("spi mode: 0x%x\n", mode);
-
-	/*
-	 * bits per word
-	 */
 	ret = ioctl(fd, SPI_IOC_WR_BITS_PER_WORD, &bits);
 	if (ret == -1)
 		pabort("can't set bits per word");
@@ -485,11 +295,6 @@ int main(int argc, char *argv[])
 	if (ret == -1)
 		pabort("can't get bits per word");
 
-//	printf("bits per word: %d\n", bits);
-
-	/*
-	 * max speed hz
-	 */
 	ret = ioctl(fd, SPI_IOC_WR_MAX_SPEED_HZ, &speed);
 	if (ret == -1)
 		pabort("can't set max speed hz");
@@ -498,60 +303,33 @@ int main(int argc, char *argv[])
 	if (ret == -1)
 		pabort("can't get max speed hz");
 
-	printf("max speed: %d Hz (%d KHz) \n", speed, speed/1000);
-	close(fd);
-#endif
-	if (spislave){
-		fd = open(device, O_RDWR);
-		if (fd < 0)
-			pabort("can't open device");
+	printf("max speed: %d Hz (%d KHz) \n", speed, speed / 1000);
+
+	if (spislave) {
 		printf("SPI SLAVE TEST 32 bytes one Shot ^^ \n");
-		slave_transfer(fd, rx, sizeof(rx), 1);
-	}else {
-		printf("SPI SLAVE TEST START  %d time \n", testCount);
-		printf("SPI SLAVE TEST %d X 2(uint16) Bytes  %d bits word [%d] ea Shot \n",data_size , bits ,DATA_EA);
-		fd = open(device, O_RDWR);
-		for (i = 0; i < DATA_EA; i++){
-//			fd = open(device, O_RDWR);
-			if (fd < 0)
-				pabort("can't open device");
+		slave_transfer(fd, rx, data_size, 1);
+	} else {
+		printf("SPI MASTER TEST START\n");
+		master_transfer(fd, tx, rx, data_size, 1);
 
-			if (input_tx) {
-				size = strlen(input_tx+1);
-				tx = malloc(size);
-				rx = malloc(size);
-				size = unescape((char *)tx, input_tx, size);
-				master_transfer(fd, tx, rx, size, 1);
-				free(rx);
-				free(tx);
-			} else {
-				if (spidev3_0) {
-					printf("BMI120 Chip ID Read \n");
-					master_transfer(fd, read_bmi120_chip_id_tx, read_bmi120_chip_id_rx, sizeof(read_bmi120_chip_id_tx), 1);
-				} else {
-
-			if (spislave){
-				printf("SPI SLAVE TEST 32 bytes one Shot \n");
-				slave_transfer(fd,  rx, sizeof(tx), 1);
+		int match = 1;
+		for (i = 0; i < data_size; i++) {
+			if (rx[i] != tx[i]) {
+				printf("Err: num %d [Sent: %x] [Received: %x] \n", i, tx[i], rx[i]);
+				match = 0;
 			}
-			else{
-//						printf("SPI SLAVE TEST START %d time \n", testCount);
-//						printf("SPI SLAVE TEST %d X 2(uint16) Bytes  %d bits word [%d] ea Shot \n",FIFO_DEPTH_DEFINDED , bits ,DATA_EA);
-						master_transfer(fd, default_tx, default_rx, sizeof(tx), 0);
-						int flag = 0;
-						for (int j = 0; j < data_size; j++) {
-							if (rx[j] != tx[j]) {
-								printf("Err: num %d [Sent: %x] [Received: %x] \n", j, tx[j], rx[j]);
-								flag = 1;
-							}
-						}
-					}
-				}
-			}
-//			close(fd);
 		}
-	close(fd);
+		if (match) {
+			printf("[SPI] OK\n");
+		} else {
+			printf("[SPI] FAIL\n");
+		}
 	}
-	printf("SPI SLAVE TEST END \n");
+
+	free(tx);
+	free(rx);
+	close(fd);
+
+	printf("SPI TEST END\n");
 	return ret;
 }
