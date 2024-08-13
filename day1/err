@@ -40,9 +40,6 @@ static void hex_dump(const void *src, size_t length, size_t line_size, char *pre
         if (!(++i % line_size) || (length == 0 && i % line_size)) {
             if (length == 0) {
                 while (i++ % line_size)
-
-
-                
                     printf("__ ");
             }
             printf(" | ");
@@ -209,14 +206,13 @@ static void parse_opts(int argc, char *argv[])
     }
 }
 
-#define DATA_EA (1)		//(100000)
+#define DATA_EA (1)
 
 int main(int argc, char *argv[])
 {
     int ret = 0;
     int i = 0;
     int fd;
-    int testCount = 1;
     uint8_t *tx;
     uint8_t *rx;
 
@@ -268,38 +264,54 @@ int main(int argc, char *argv[])
 
     if (spislave) {
         printf("SPI SLAVE TEST %d bytes one Shot ^^ \n", data_size);
+
+        struct spi_ioc_transfer tr = {
+            .tx_buf = (unsigned long)rx,  // Initial transmit buffer is empty
+            .rx_buf = (unsigned long)rx,  // Receive buffer
+            .len = data_size,
+            .delay_usecs = delay,
+            .speed_hz = speed,
+            .bits_per_word = bits,
+        };
+
         printf("SLAVE ready to receive data\n");
-        ret = read(fd, rx, data_size);
-        if (ret < 0)
-            pabort("Failed to read data from SPI");
-        
+        ret = ioctl(fd, SPI_IOC_MESSAGE(1), &tr); // Receive data from master
+        if (ret < 1)
+            pabort("can't receive spi message");
+
         printf("Received data on slave:\n");
         hex_dump(rx, data_size, 16, "RX");
 
-        printf("-------------------------------\n");
-        printf("SLAVE ready to send data\n");
+        // Now send the received data back to the master
+        tr.tx_buf = (unsigned long)rx;  // Reuse received data as the transmit buffer
+        tr.rx_buf = 0;  // We don't need to receive anything during the send
 
-        ret = write(fd, rx, data_size);
-        if (ret < 0)
-            pabort("Failed to write data to SPI");
+        printf("SLAVE ready to send data\n");
+        ret = ioctl(fd, SPI_IOC_MESSAGE(1), &tr); // Send data back to master
+        if (ret < 1)
+            pabort("can't send spi message");
 
         printf("Sent data back from slave:\n");
         hex_dump(rx, data_size, 16, "TX");
     } else {
         printf("SPI MASTER TEST START %d time \n", testCount);
         for (i = 0; i < testCount; i++) {
+            struct spi_ioc_transfer tr = {
+                .tx_buf = (unsigned long)tx,
+                .rx_buf = (unsigned long)rx,
+                .len = data_size,
+                .delay_usecs = delay,
+                .speed_hz = speed,
+                .bits_per_word = bits,
+            };
+
             printf("SPI MASTER TEST %d bytes data transfer \n", data_size);
-            ret = write(fd, tx, data_size);
-            if (ret < 0)
-                pabort("Failed to write data to SPI");
+            ret = ioctl(fd, SPI_IOC_MESSAGE(1), &tr); // Send and receive data
+            if (ret < 1)
+                pabort("can't send spi message");
 
             printf("Sent data from master:\n");
             hex_dump(tx, data_size, 16, "TX");
-
-            // 마스터는 이제 슬레이브로부터 데이터를 읽음
-            ret = read(fd, rx, data_size);
-            if (ret < 0)
-                pabort("Failed to read data from SPI");
 
             printf("Received data from slave:\n");
             hex_dump(rx, data_size, 16, "RX");
