@@ -125,6 +125,7 @@ static void slave_transfer(int fd, uint16_t *rx, size_t len, int dump_flag) {
         .bits_per_word = bits,
     };
 
+    // 먼저 데이터를 수신
     ret = ioctl(fd, SPI_IOC_MESSAGE(1), &tr);
     if (ret < 1) {
         pabort("can't receive spi message");
@@ -134,34 +135,23 @@ static void slave_transfer(int fd, uint16_t *rx, size_t len, int dump_flag) {
         hex_dump(rx, len, 16, "RX (received)");
     }
 
-    // 유효한 데이터가 있는지 확인
-    int valid_data = 0;
-    for (size_t i = 0; i < len / sizeof(uint16_t); i++) {
-        if (rx[i] != 0) {  // 유효한 데이터가 있는지 확인
-            valid_data = 1;
-            break;
-        }
+    // 수신된 데이터를 다시 전송 (에코)
+    struct spi_ioc_transfer tr_echo = {
+        .tx_buf = (unsigned long)rx,  // RX 버퍼의 데이터를 TX로 전송
+        .rx_buf = 0,                  // 에코 전송이므로 수신할 데이터는 필요 없음
+        .len = len,
+        .delay_usecs = delay,
+        .speed_hz = speed,
+        .bits_per_word = bits,
+    };
+
+    ret = ioctl(fd, SPI_IOC_MESSAGE(1), &tr_echo);
+    if (ret < 1) {
+        pabort("can't send spi echo message");
     }
 
-    // 유효한 데이터가 있으면 그 데이터를 에코로 전송
-    if (valid_data) {
-        struct spi_ioc_transfer tr_echo = {
-            .tx_buf = (unsigned long)rx,  // RX 버퍼의 데이터를 TX로 전송
-            .rx_buf = 0,                  // 에코 전송이므로 수신할 데이터는 필요 없음
-            .len = len,
-            .delay_usecs = delay,
-            .speed_hz = speed,
-            .bits_per_word = bits,
-        };
-
-        ret = ioctl(fd, SPI_IOC_MESSAGE(1), &tr_echo);
-        if (ret < 1) {
-            pabort("can't send spi echo message");
-        }
-
-        if (dump_flag) {
-            hex_dump(rx, len, 16, "TX (echo)");
-        }
+    if (dump_flag) {
+        hex_dump(rx, len, 16, "TX (echo)");
     }
 }
 
@@ -352,7 +342,7 @@ int main(int argc, char *argv[])
 
     if (spislave) {
         printf("SPI SLAVE TEST %d bytes one Shot ^^ \n", data_size);
-        slave_transfer(fd, (uint16_t *)tx, (uint16_t *)rx, data_size, 1);
+        slave_transfer(fd, (uint16_t *)rx, data_size, 1);
     } else {
         printf("SPI MASTER TEST START %d time \n", testCount);
         for (i = 0; i < testCount; i++) {
