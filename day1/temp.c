@@ -1,335 +1,190 @@
-#include <stdint.h>
-#include <unistd.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <getopt.h>
-#include <fcntl.h>
-#include <sys/ioctl.h>
-#include <linux/types.h>
-#include <linux/spi/spidev.h>
+#!/bin/bash
 
-#define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
-#define FIFO_DEPTH_DEFINDED	(32)
-#define DEFAULT_DATA_SIZE (256)
+INTERFACE=$1
 
-static void pabort(const char *s)
-{
-	perror(s);
-	abort();
-}
+ping_address="192.168.10.1"
 
-static const char *device = "/dev/spidev4.0";
-static uint32_t mode;
-static uint8_t bits = 16;
-static uint32_t speed = 25000000;
-static uint16_t delay;
-static int verbose;
-static int spidev3_0;
-static int spislave;
-int testCount = 1;
-static int data_size = DEFAULT_DATA_SIZE;
+# [Wifi mac 읽기 CMD] #
 
-static void hex_dump(const void *src, size_t length, size_t line_size, char *prefix)
-{
-	int i = 0;
-	const unsigned char *address = src;
-	const unsigned char *line = address;
-	unsigned char c;
+## 현재 WiFi MAC 주소를 출력
+echo "[log]: read wifi mac address"
 
-	printf("%s | ", prefix);
-	while (length-- > 0) {
-		printf("%02X ", *address++);
-		if (!(++i % line_size) || (length == 0 && i % line_size)) {
-			if (length == 0) {
-				while (i++ % line_size)
-					printf("__ ");
-			}
-			printf(" | ");
-			while (line < address) {
-				c = *line++;
-				printf("%c", (c < 33 || c == 255) ? 0x2E : c);
-			}
-			printf("\n");
-			if (length > 0)
-				printf("%s | ", prefix);
-		}
-	}
-}
+current_mac=$(cat /sys/class/net/wlan0/address)
+echo " "
+echo "----------------------------------------"
+echo "| WiFi MAC Address |"
+echo "----------------------------------------"
+echo "| $current_mac |"
+echo "----------------------------------------"
+echo " "
 
-static void master_transfer(int fd, uint8_t const *tx, uint8_t const *rx, size_t len, int dump_flag)
-{
-	int ret;
+# 사용자에게 확인 요청
+while true; do
+read -p "Is it right to intended wifi maccaddress ? (y/n):" user_input
 
-	printf("master transfer... \n");
-	struct spi_ioc_transfer tr_transfer = {
-		.tx_buf = (unsigned long)tx,
-		.rx_buf = (unsigned long)rx,
-		.len = len,
-		.delay_usecs = delay,
-		.speed_hz = speed,
-		.bits_per_word = bits,
-	};
+if [ "$user_input" == "y" ]; then
+echo "[log]: read mac address SUCCESS"
+break
+elif [ "$user_input" == "n" ]; then
+echo "[wlan0]: FAIL (not intended wlan mac address)"
+exit 1
+else
+echo "Wrong input. please input 'y' or 'n'."
+fi
+done
 
-	ret = ioctl(fd, SPI_IOC_MESSAGE(1), &tr_transfer);
-	if (ret < 1)
-		pabort("can't send spi message");
-	if (dump_flag) {
-		hex_dump(tx, len, 64, "TX");
-		hex_dump(rx, len, 64, "RX");
-	}
-}
 
-static void slave_transfer(int fd, uint8_t *rx, size_t len, int dump_flag)
-{
-	int ret;
 
-	printf("slave recieved... \n");
+# [AP 연결] #
 
-	struct spi_ioc_transfer tr_recieve = {
-		.tx_buf = 0,
-		.rx_buf = (unsigned long)rx,
-		.len = len,
-		.delay_usecs = delay,
-		.speed_hz = speed,
-		.bits_per_word = bits,
-	};
+## Set a timeout duration (in seconds)
+TIMEOUT_DURATION=60
 
-	ret = ioctl(fd, SPI_IOC_MESSAGE(1), &tr_recieve);
-	if (ret < 1)
-		pabort("can't receive spi message");
-	if (dump_flag) {
-		hex_dump(rx, len, 64, "RX");
-	}
+## step 1: systemctl stop wpa_supplicant
 
-	printf("slave sending back... \n");
+echo "[log]: systemctl stop wpa_supplicant"
+SECONDS=0
+systemctl stop wpa_supplicant &
+cmd_pid=$!
+while kill -0 $cmd_pid 2> /dev/null; do
+echo "[log] running systemctl stop wpa_supplicant ... in $SECONDS"
+if [ $SECONDS -ge $TIMEOUT_DURATION ]; then
+kill -9 $cmd_pid
+wait $cmd_pid 2>/dev/null
+echo "[log]: systemctl stop wpa_supplicant TIMEOUT"
+break
+fi
+sleep 1
+done
+if [ $? -eq 0 ]; then
+echo "[log]: systemctl stop wpa_supplicant SUCCESS"
+else
+echo "[wlan]: FAIL (systemctl stop wpa_supplicant SUCCESS)"
+exit 1
+fi
 
-	struct spi_ioc_transfer tr_send = {
-		.tx_buf = (unsigned long)rx,
-		.rx_buf = 0,
-		.len = len,
-		.delay_usecs = delay,
-		.speed_hz = speed,
-		.bits_per_word = bits,
-	};
+sleep 1
 
-	ret = ioctl(fd, SPI_IOC_MESSAGE(1), &tr_send);
-	if (ret < 1)
-		pabort("can't send spi message");
-	if (dump_flag) {
-		hex_dump(rx, len, 64, "TX");
-	}
-}
+# step 2: ifconfig $INTERFACE up
+echo "[log]: ifconfig $INTERFACE up"
+SECONDS=0
+ifconfig $INTERFACE up &
+cmd_pid=$!
+while kill -0 $cmd_pid 2> /dev/null; do
+echo "[log] running ifconfig $INTERFACE up ... in $SECONDS"
+if [ $SECONDS -ge $TIMEOUT_DURATION ]; then
+kill -9 $cmd_pid
+wait $cmd_pid 2>/dev/null
+echo "[log]: ifconfig $INTERFACE up TIMEOUT"
+break
+fi
+sleep 1
+done
 
-static void print_usage(const char *prog)
-{
-	printf("Usage: %s [-DsbdlHOLC3]\n", prog);
-	puts("  -D --device   device to use (default /dev/spidev1.0)\n"
-	     "  -s --speed    max speed (Hz)\n"
-	     "  -d --delay    delay (usec)\n"
-	     "  -b --bpw      bits per word \n"
-	     "  -l --loop     loopback\n"
-	     "  -H --cpha     clock phase\n"
-	     "  -O --cpol     clock polarity\n"
-	     "  -L --lsb      least significant bit first\n"
-	     "  -C --cs-high  chip select active high\n"
-	     "  -3 --3wire    SI/SO signals shared\n"
-	     "  -v --verbose  Verbose (show tx buffer)\n"
-	     "  -i --spidev3.0  dev changed \n"
-	     "  -p            Data size (1 to 256 bytes)\n"
-	     "  -N --no-cs    no chip select\n"
-	     "  -R --ready    slave pulls low to pause\n"
-	     "  -2 --dual     dual transfer\n"
-	     "  -4 --quad     quad transfer\n");
-	exit(1);
-}
+wait $cmd_pid
+if [ $? -eq 0 ]; then
+echo "[log]: ifconfig $INTERFACE up SUCCESS"
+else
+echo "[log]: ifconfig $INTERFACE up FAIL"
+echo "[wlan]: FAIL (ifconfig $INTERFACE up)"
+exit 1
+fi
 
-static void parse_opts(int argc, char *argv[])
-{
-	while (1) {
-		static const struct option lopts[] = {
-			{ "device",  1, 0, 'D' },
-			{ "speed",   1, 0, 's' },
-			{ "delay",   1, 0, 'd' },
-			{ "bpw",     1, 0, 'b' },
-			{ "loop",    0, 0, 'l' },
-			{ "cpha",    0, 0, 'H' },
-			{ "cpol",    0, 0, 'O' },
-			{ "lsb",     0, 0, 'L' },
-			{ "cs-high", 0, 0, 'C' },
-			{ "3wire",   0, 0, '3' },
-			{ "no-cs",   0, 0, 'N' },
-			{ "ready",   0, 0, 'R' },
-			{ "dual",    0, 0, '2' },
-			{ "verbose", 0, 0, 'v' },
-			{ "spidev3.0", 0, 0, 'i' },
-			{ "spislave", 0, 0, 'S' },
-			{ "quad",    0, 0, '4' },
-			{ NULL, 0, 0, 0 },
-		};
-		int c;
+sleep 1
 
-		c = getopt_long(argc, argv, "D:s:d:b:lHOLC3NR24p:viS", lopts, NULL);
+# 기존 wpa_supplicant 프로세스 종료 및 소켓 파일 삭제
+if pgrep wpa_supplicant > /dev/null; then
+echo "[log]: There is already a wpa_supplicant process."
+echo "[log]: Terminating existing wpa_supplicant process."
+wpa_pids=$(pgrep wpa_supplicant)
+for pid in $wpa_pids; do
+kill $pid
+done
+sleep 2
+fi
 
-		if (c == -1)
-			break;
+if [ -e /var/run/wpa_supplicant/$INTERFACE ]; then
+echo "[log] There is already socket file."
+echo "[log]: Removing existing socket file."
+rm /var/run/wpa_supplicant/$INTERFACE
+fi
 
-		switch (c) {
-		case 'D':
-			device = optarg;
-			break;
-		case 's':
-			speed = atoi(optarg);
-			break;
-		case 'd':
-			delay = atoi(optarg);
-			break;
-		case 'b':
-			bits = atoi(optarg);
-			break;
-		case 'l':
-			mode |= SPI_LOOP;
-			break;
-		case 'H':
-			mode |= SPI_CPHA;
-			break;
-		case 'O':
-			mode |= SPI_CPOL;
-			break;
-		case 'L':
-			mode |= SPI_LSB_FIRST;
-			break;
-		case 'C':
-			mode |= SPI_CS_HIGH;
-			break;
-		case '3':
-			mode |= SPI_3WIRE;
-			break;
-		case 'N':
-			mode |= SPI_NO_CS;
-			break;
-		case 'v':
-			verbose = 1;
-			break;
-		case 'R':
-			mode |= SPI_READY;
-			break;
-		case 'p':
-			data_size = atoi(optarg);
-			if (data_size > 256 || data_size <= 0) {
-				fprintf(stderr, "Data size must be between 1 and 256 bytes.\n");
-				exit(EXIT_FAILURE);
-			}
-			break;
-		case '2':
-			mode |= SPI_TX_DUAL;
-			break;
-		case '4':
-			mode |= SPI_TX_QUAD;
-			break;
-		case 'i':
-			spidev3_0 = 1;
-			device = "/dev/spidev3.0";
-			break;
-		case 'S':
-			spislave = 1;
-			break;
-		default:
-			print_usage(argv[0]);
-			break;
-		}
-	}
 
-	if (mode & SPI_LOOP) {
-		if (mode & SPI_TX_DUAL)
-			mode |= SPI_RX_DUAL;
-		if (mode & SPI_TX_QUAD)
-			mode |= SPI_RX_QUAD;
-	}
-}
+# step 3: wpa_supplicant -B -Dnl80211 -iwlan0 -c/etc/wpa_supplicant.conf
+echo "[log]: wpa_supplicant -B -Dnl80211 -i$INTERFACE -c/etc/wpa_supplicant.conf"
+wpa_supplicant -B -Dnl80211 -i$INTERFACE -c/etc/wpa_supplicant.conf &
+cmd_pid=$!
+while kill -0 $cmd_pid 2> /dev/null; do
+echo "[log] running wpa_supplicant ... in $SECONDS"
+if [ $SECONDS -ge $TIMEOUT_DURATION ]; then
+kill -9 $cmd_pid
+wait $cmd_pid 2>/dev/null
+echo "[log]: wpa_supplicant TIMEOUT"
+break
+fi
+sleep 1
+done
+wait $cmd_pid
+if [ $? -eq 0 ]; then
+echo "[log]: wpa_supplicant SUCCESS"
+else
+echo "[log]: wpa_supplicant FAIL"
+echo "[wlan]: FAIL (wpa_supplicant -B -Dnl80211 -i$INTERFACE -c/etc/wpa_supplicant.conf)"
+exit 1
+fi
 
-#define DATA_EA (1)
 
-int main(int argc, char *argv[])
-{
-	int ret = 0;
-	int i = 0;
-	int fd;
-	uint8_t *tx;
-	uint8_t *rx;
-	spidev3_0 = 0;
 
-	parse_opts(argc, argv);
+sleep 5
+# step 4 : udhcpc -i $INTERFACE
+echo "[log]: udhcpc -i $INTERFACE"
+SECONDS=0
+udhcpc -i $INTERFACE &
+cmd_pid=$!
+while kill -0 $cmd_pid 2> /dev/null; do
+echo "[log] running udhcpc ... in $SECONDS"
+if [ $SECONDS -ge $TIMEOUT_DURATION ]; then
+echo "kill $cmd_pid"
+kill -9 $cmd_pid
+wait $cmd_pid 2>/dev/null
+echo "[log]: udhcpc -i $INTERFACE TIMEOUT"
+break
+fi
+sleep 1
+done
+wait $cmd_pid
+if [ $? -eq 0 ]; then
+echo "[log]: udhcpc -i $INTERFACE SUCCESS"
+else
+echo "[log]: udhcpc -i $INTERFACE FAIL"
+dmesg > /lg_rw/dmesg_udhcpc_i_${INTERFACE}_fail.log
+echo "[wlan]: FAIL (udhcpc -i $INTERFACE)"
+exit 1
+fi
 
-	tx = malloc(data_size);
-	rx = malloc(data_size);
+sleep 5
+echo "[log]: ping to $ping_address"
+# # step 5 :Check if wlan0 is connected to the internet
+SECONDS=0
+ping -I $INTERFACE -c 5 $ping_address &> /dev/null &
+cmd_pid=$!
+while kill -0 $cmd_pid 2> /dev/null; do
+echo "[log] running ping ... in $SECONDS"
+if [ $SECONDS -ge $TIMEOUT_DURATION ]; then
+kill -9 $cmd_pid
+wait $cmd_pid 2>/dev/null
+echo "[log]: ping TIMEOUT"
+break
+fi
+sleep 1
+done
+wait $cmd_pid
+if [ $? -eq 0 ]; then
+echo "[wlan]: OK"
+exit 1
+else
+echo "[wlan]: FAIL (ping)"
+exit 1
+fi
 
-	if (tx == NULL || rx == NULL) {
-		pabort("Failed to allocate memory for buffers");
-	}
-
-	for (i = 0; i < data_size; i++) {
-		tx[i] = i % 256;
-		rx[i] = 0;
-	}
-
-	mode = SPI_MODE_3;
-
-	fd = open(device, O_RDWR);
-	if (fd < 0)
-		pabort("can't open device");
-
-	ret = ioctl(fd, SPI_IOC_WR_MODE32, &mode);
-	if (ret == -1)
-		pabort("can't set spi mode");
-
-	ret = ioctl(fd, SPI_IOC_RD_MODE32, &mode);
-	if (ret == -1)
-		pabort("can't get spi mode");
-
-	ret = ioctl(fd, SPI_IOC_WR_BITS_PER_WORD, &bits);
-	if (ret == -1)
-		pabort("can't set bits per word");
-
-	ret = ioctl(fd, SPI_IOC_RD_BITS_PER_WORD, &bits);
-	if (ret == -1)
-		pabort("can't get bits per word");
-
-	ret = ioctl(fd, SPI_IOC_WR_MAX_SPEED_HZ, &speed);
-	if (ret == -1)
-		pabort("can't set max speed hz");
-
-	ret = ioctl(fd, SPI_IOC_RD_MAX_SPEED_HZ, &speed);
-	if (ret == -1)
-		pabort("can't get max speed hz");
-
-	printf("max speed: %d Hz (%d KHz) \n", speed, speed / 1000);
-
-	if (spislave) {
-		printf("SPI SLAVE TEST 32 bytes one Shot ^^ \n");
-		slave_transfer(fd, rx, data_size, 1);
-	} else {
-		printf("SPI MASTER TEST START\n");
-		master_transfer(fd, tx, rx, data_size, 1);
-
-		int match = 1;
-		for (i = 0; i < data_size; i++) {
-			if (rx[i] != tx[i]) {
-				printf("Err: num %d [Sent: %x] [Received: %x] \n", i, tx[i], rx[i]);
-				match = 0;
-			}
-		}
-		if (match) {
-			printf("[SPI] OK\n");
-		} else {
-			printf("[SPI] FAIL\n");
-		}
-	}
-
-	free(tx);
-	free(rx);
-	close(fd);
-
-	printf("SPI TEST END\n");
-	return ret;
-}
+이렇게 작성된 파일을, 파이썬으로 실행시켰을 때 기존에 그냥 실행시켰을 때와 동일하게 작성되도록 파이썬 코드를 짜줘. 이 파일의 이름은 wlan0_test.sh 야.
