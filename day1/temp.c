@@ -1,4 +1,5 @@
 import subprocess
+import sys
 
 # wlan0_test.sh 파일 실행
 script_path = './wlan0_test.sh'  # 스크립트 경로
@@ -8,10 +9,17 @@ log_file = 'last_log.txt'  # 로그를 저장할 파일 이름
 try:
     # 스크립트를 실행하고 실시간으로 출력하면서 마지막 줄을 기록
     with open(log_file, 'w') as f:
-        process = subprocess.Popen([script_path, interface], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+        process = subprocess.Popen(
+            [script_path, interface], 
+            stdout=subprocess.PIPE, 
+            stderr=subprocess.STDOUT, 
+            text=True, 
+            bufsize=1,  # 라인 버퍼링
+            universal_newlines=True  # 텍스트 모드에서 유니코드/줄 단위 처리
+        )
         last_line = ""
         for line in process.stdout:
-            print(line, end="")  # 터미널에 실시간 출력
+            print(line, end="", flush=True)  # 터미널에 실시간 출력 및 플러시
             last_line = line.strip()  # 마지막 줄 갱신
             f.write(line)  # 로그 파일에 기록
         
