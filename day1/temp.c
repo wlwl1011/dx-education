@@ -15,6 +15,7 @@ try:
     # 마지막 10줄을 저장합니다.
     last_lines = output_lines[-10:]  # 필요에 따라 숫자를 조정하여 더 많은 줄을 가져올 수 있습니다.
     
+    # 로그 파일에 저장
     with open(log_file, 'w') as f:
         f.write('\n'.join(last_lines))
     
