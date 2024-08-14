@@ -6,23 +6,18 @@ interface = 'wlan0'  # 인터페이스 이름
 log_file = 'last_log.txt'  # 로그를 저장할 파일 이름
 
 try:
-    # 스크립트를 실행하고 stdout을 캡처합니다.
-    result = subprocess.run([script_path, interface], check=True, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-    
-    # 캡처된 로그를 줄 단위로 나눕니다.
-    output_lines = result.stdout.splitlines()
-    
-    # 마지막 10줄을 저장합니다.
-    last_lines = output_lines[-10:]  # 필요에 따라 숫자를 조정하여 더 많은 줄을 가져올 수 있습니다.
-    
-    # 로그 파일에 저장
+    # 스크립트를 실행하고 실시간으로 출력하면서 마지막 줄을 기록
     with open(log_file, 'w') as f:
-        f.write('\n'.join(last_lines))
-    
-    print(f"Last log lines saved to {log_file}")
+        process = subprocess.Popen([script_path, interface], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+        last_line = ""
+        for line in process.stdout:
+            print(line, end="")  # 터미널에 실시간 출력
+            last_line = line.strip()  # 마지막 줄 갱신
+            f.write(line)  # 로그 파일에 기록
+        
+        process.wait()  # 프로세스가 종료될 때까지 대기
 
-except subprocess.CalledProcessError as e:
-    print(f"Script failed with return code {e.returncode}")
-    print(f"Output: {e.output}")
+    print(f"Last log line saved to {log_file}")
+
 except FileNotFoundError:
     print("Script file not found. Please check the script path.")
