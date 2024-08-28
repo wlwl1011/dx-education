@@ -3,8 +3,8 @@
 import subprocess
 import os
 from datetime import datetime
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import yaml
-import glob
 
 # 사용자에게 날짜 입력을 받아 확인
 def get_log_date():
@@ -31,6 +31,30 @@ with open('/lg_rw/fct_test/cfg.yml', 'r') as file:
 # global 설정 읽기
 global_config = config['global']
 
+# WiFi 설정을 wpa_supplicant.conf 파일에 작성
+wifi_config = config['wifi']
+if wifi_config['enable']:
+    wpa_supplicant_conf = f"""
+ctrl_interface=/var/run/wpa_supplicant
+ctrl_interface_group=0
+update_config=1
+network={{
+    ssid="{wifi_config['ssid']}"
+    psk="{wifi_config['password']}"
+    key_mgmt=WPA-PSK
+}}
+"""
+    with open('/lg_rw/fct_test/wpa_supplicant.conf', 'w') as wpa_file:
+        wpa_file.write(wpa_supplicant_conf)
+
+    # 네트워크 인터페이스 설정
+    subprocess.run("dmesg -n 1", shell=True)
+    subprocess.run("mount -o rw,remount /", shell=True)
+    subprocess.run("ifconfig wlan0 up", shell=True)
+    # wpa_supplicant.conf 파일 복사 및 권한 설정
+    subprocess.run("cp -f /lg_rw/fct_test/wpa_supplicant.conf /etc/wpa_supplicant.conf", shell=True)
+    subprocess.run("chmod +x /etc/wpa_supplicant.conf", shell=True)
+
 # WiFi 및 BLE MAC 주소 읽기
 def get_mac_address(interface):
     try:
@@ -44,62 +68,12 @@ ble_mac = get_mac_address('hci0')  # hci0은 BLE 인터페이스로 가정
 
 # 로그 파일 설정
 log_file_path = '/lg_rw/fct_test/fct_test.log'
-usb_log_file_name = f"fct_test_{wifi_mac}_{ble_mac}.log"
-usb_log_file_path = None
+usb_log_file_path = f"fct_test_{wifi_mac}_{ble_mac}.log"
 
-# USB 마운트 및 로그 작성
-def mount_usb_and_save_log():
-    global usb_log_file_path
-    mount_point = "/mnt/usb_test"  # USB를 마운트할 임시 경로
-
-    if not os.path.exists(mount_point):
-        os.makedirs(mount_point)
-
-    # USB 장치 이름 확인
-    usb_dev_name = subprocess.run("lsblk -o NAME,TYPE | grep 'disk' | grep -o '^sd[a-z]'", shell=True, capture_output=True, text=True).stdout.strip()
-    if not usb_dev_name:
-        print("[USB]: Fail - No USB device found")
-        return False
-
-    # USB 파티션 마운트 시도
-    partitions = glob.glob(f"/dev/{usb_dev_name}*")
-    mount_success = False
-    for partition in partitions:
-        print(f"Attempting to mount {partition} to {mount_point}")
-        result = subprocess.run(f"mount {partition} {mount_point}", shell=True)
-        if result.returncode == 0:
-            mount_success = True
-            usb_dev_path = partition
-            break
-        else:
-            print(f"[USB]: Failed to mount {partition}")
-
-    if not mount_success:
-        print("[USB]: Fail - Could not mount any USB partition")
-        return False
-
-    usb_log_file_path = os.path.join(mount_point, usb_log_file_name)
-    print(f"USB mounted at {mount_point}. Log file will be saved at {usb_log_file_path}")
-
-    # 로그 파일 작성
-    try:
-        with open(usb_log_file_path, 'w') as usb_log_file:
-            usb_log_file.write("###############################################################\n")
-            usb_log_file.write(f"Test started at: {log_date} {datetime.now().strftime('%H:%M:%S')}\n")
-        print(f"[USB]: Log file saved at {usb_log_file_path}")
-    except Exception as e:
-        print(f"[USB]: Fail - Could not write log file: {e}")
-        return False
-
-    # USB 언마운트
-    subprocess.run(f"umount {mount_point}", shell=True)
-    return True
-
-# USB에 로그 저장 시도
-if not mount_usb_and_save_log():
-    print("USB logging failed. Logs will only be saved locally.")
-
-# 이후 로직은 이전과 동일하게 유지
+# 로그 파일에 날짜 기록
+with open(log_file_path, 'a') as log_file:
+    log_file.write("###############################################################\n")
+    log_file.write(f"Test started at: {log_date}\n")
 
 # 테스트 항목들
 test_items = {
@@ -116,7 +90,7 @@ test_items = {
 
 # 실시간 출력을 처리하는 함수
 def run_test_script(script, args):
-    print(f"Running {script} {args}...", flush=True)
+    #print(f"Running {script} {args}...", flush=True)
     process = subprocess.Popen(
         f"{script} {args}",
         shell=True,
@@ -191,7 +165,7 @@ def execute_test(item, script):
                 result_code, log_lines = run_test_script(f"/lg_rw/fct_test/{script}", args)
                 last_line = log_lines[-1] if log_lines else "No output"
 
-            print(last_line, flush=True)
+            #print(last_line, flush=True)
 
             if "OK" in last_line:
                 test_results[test_name] = last_line
@@ -200,6 +174,22 @@ def execute_test(item, script):
             # If the loop completes without a break, record the last result
             test_results[test_name] = last_line
 
+# 병렬 실행 여부 확인
+parallel = config.get('global', {}).get('parallel', False)
+if parallel:
+    with ThreadPoolExecutor() as executor:
+        futures = {executor.submit(execute_test, item, script): item for item, script in test_items.items()}
+        for future in as_completed(futures):
+            item = futures[future]
+            try:
+                future.result()
+            except Exception as exc:
+                print(f"{item} generated an exception: {exc}")
+else:
+    for item, script in test_items.items():
+        execute_test(item, script)
+
+
 # 테스트 결과 확인 및 출력
 all_tests_passed = True
 failed_count = 0
@@ -207,30 +197,28 @@ total_count = 0
 print("-" * 40, flush=True)
 print("-" * 40, flush=True)
 with open(log_file_path, 'a') as log_file:
-    if usb_log_file_path:
-        with open(usb_log_file_path, 'a') as usb_log_file:
-            for test_name, result in test_results.items():
-                total_count += 1
-                print(result, flush=True)
-                log_file.write(f"{test_name}: {result}\n")
-                usb_log_file.write(f"{test_name}: {result}\n")
-            print("-" * 40, flush=True)
-            print("-" * 40, flush=True)
-            log_file.write("-" * 40 + "\n")
-            usb_log_file.write("-" * 40 + "\n")
+    for test_name, result in test_results.items():
+        total_count += 1
+        print(result, flush=True)
+        log_file.write(f"{test_name}: {result}\n")
+        if "OK" not in result:
+            all_tests_passed = False
+            failed_count += 1
+    print("-" * 40, flush=True)
+    print("-" * 40, flush=True)
+    log_file.write("-" * 40 + "\n")
 
 # 전체 테스트 결과 출력
 with open(log_file_path, 'a') as log_file:
-    if usb_log_file_path:
-        with open(usb_log_file_path, 'a') as usb_log_file:
-            if all_tests_passed:
-                print("[ALL TESTS]: OK", flush=True)
-                log_file.write("[ALL TESTS]: OK\n")
-                usb_log_file.write("[ALL TESTS]: OK\n")
-            else:
-                print(f"[ALL TESTS]: {failed_count} out of {total_count} tests failed", flush=True)
-                log_file.write(f"[ALL TESTS]: {failed_count} out of {total_count} tests failed\n")
-                usb_log_file.write(f"[ALL TESTS]: {failed_count} out of {total_count} tests failed\n")
+    if all_tests_passed:
+        print("[ALL TESTS]: OK", flush=True)
+        log_file.write("[ALL TESTS]: OK\n")
+    else:
+        print(f"[ALL TESTS]: {failed_count} out of {total_count} tests failed", flush=True)
+        log_file.write(f"[ALL TESTS]: {failed_count} out of {total_count} tests failed\n")
+
+
+
 
 # Autostart 설정
 if global_config.get('autostart', False):
