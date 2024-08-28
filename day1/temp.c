@@ -79,7 +79,7 @@ with open(log_file_path, 'a') as log_file:
 def find_usb_mount_point():
     mount_points = subprocess.run("lsblk -o MOUNTPOINT,FSTYPE", shell=True, capture_output=True, text=True).stdout.splitlines()
     for mount_point in mount_points:
-        if "exfat" in mount_point or "/media" in mount_point or "/mnt" in mount_point:
+        if any(fs in mount_point for fs in ["exfat", "vfat", "/media", "/mnt"]):
             return mount_point.split()[0].strip()
     return None
 
@@ -95,6 +95,8 @@ if usb_mount_point:
         except OSError as e:
             print(f"Failed to create directory {usb_log_dir}: {e}")
             usb_log_file_path = None
+    else:
+        print(f"USB mounted at {usb_mount_point}. Log will be saved at {usb_log_file_path}")
 else:
     print("USB not found or not mounted. The log will only be saved locally.")
 
