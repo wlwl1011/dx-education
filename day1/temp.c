@@ -75,6 +75,7 @@ echo "Starting scan..."
   bt_pid=$!
 
   # MAC 주소를 찾기 위한 루프
+  found=false
   while [ $SECONDS -lt $end_time ]; do
     # bluetoothctl devices 명령어의 출력을 LOG_FILE에 저장하고 터미널에 출력
     bluetoothctl devices | tee -a $LOG_FILE
@@ -83,6 +84,7 @@ echo "Starting scan..."
     if grep -q "$TARGET_MAC" $LOG_FILE; then
       echo "true" > $RESULT_FILE
       echo "found target mac"
+      found=true
       kill $bt_pid  # bluetoothctl 종료
       break
     fi
@@ -90,7 +92,7 @@ echo "Starting scan..."
   done
 
   # 종료 시 scan off 및 bluetoothctl exit
-  if ps -p $bt_pid > /dev/null; then
+  if $found == false && kill -0 $bt_pid 2>/dev/null; then
     {
       echo -e 'scan off\n'
       sleep 1
