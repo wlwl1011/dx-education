@@ -1,7 +1,6 @@
-
 #!/bin/bash
 
-#./ble_test.sh -m "8A:88:4B:40:1D:64" -t 60
+# ./ble_test.sh -m "8A:88:4B:40:1D:64" -t 60
 
 # 명령 인자 처리
 while getopts "m:t:" opt; do
@@ -27,7 +26,6 @@ get_current_mac_address() {
     exit 1
 }
 
-
 # 현재 BLE MAC 주소를 가져오기
 current_mac=$(get_current_mac_address)
 echo "Current BLE MAC address is: $current_mac"
@@ -48,7 +46,6 @@ while true; do
     fi
 done
 
-
 # 기본값 설정
 TARGET_MAC=${TARGET_MAC:-"8A:88:4B:60:1F:FF"} # 찾고자 하는 MAC 주소
 TIMEOUT=${TIMEOUT:-30} # 스캔할 최대 시간(초)
@@ -64,23 +61,13 @@ LOG_FILE="log.txt"
 # bluetoothctl을 사용하여 스캔을 시작
 echo "Starting scan..."
 
-# 스캔 결과를 LOG_FILE에 저장하고 터미널에 출력하는 백그라운드 프로세스 시작
+# bluetoothctl 프로세스를 직접 제어
 {
+  # 블루투스 스캔 시작
+  echo -e 'scan on\n'
+  
   end_time=$((SECONDS + TIMEOUT))
 
-  # 서브쉘에서 bluetoothctl 실행
-  {
-    sleep 1
-    echo -e 'scan on\n'
-    sleep $TIMEOUT
-    echo -e 'scan off\n'
-    sleep 1
-    echo -e 'exit\n'
-  } | bluetoothctl &
-
-  ble_pid=$!
-
-  # MAC 주소를 찾기 위한 루프
   while [ $SECONDS -lt $end_time ]; do
     # bluetoothctl devices 명령어의 출력을 LOG_FILE에 저장하고 터미널에 출력
     bluetoothctl devices | tee -a $LOG_FILE
@@ -89,31 +76,34 @@ echo "Starting scan..."
     if grep -q "$TARGET_MAC" $LOG_FILE; then
       echo "true" > $RESULT_FILE
       echo "found target mac"
-      kill $ble_pid
+
+      # 블루투스 스캔 종료 및 bluetoothctl 종료
+      echo -e 'scan off\n'
+      echo -e 'exit\n'
+      break
     fi
     sleep 1
-  done &
-  
-  # 백그라운드 프로세스가 종료될 때까지 대기
-  wait
-
-  echo "Stopping scan..."
-  sleep 2
-
-  # 모든 장치 제거
-  echo "Removing all devices..."
-  bluetoothctl devices | grep "Device" | while read -r line; do
-    MAC=$(echo $line | awk '{print $2}')
-    bluetoothctl remove $MAC
   done
 
-  # RESULT_FILE의 값을 읽어 최종 결과 출력
-  RESULT=$(cat $RESULT_FILE)
-  if [ "$RESULT" = "true" ]; then
-    echo "[Ble] OK"
-    echo "[Ble] OK"
-    echo "[Ble] OK"
-  else
-    echo "[Ble] FAIL"
-  fi
-}
+  # 만약 TIMEOUT까지 찾지 못했으면 스캔 종료
+  echo -e 'scan off\n'
+  echo -e 'exit\n'
+
+} | bluetoothctl
+
+# 모든 장치 제거
+echo "Removing all devices..."
+bluetoothctl devices | grep "Device" | while read -r line; do
+  MAC=$(echo $line | awk '{print $2}')
+  bluetoothctl remove $MAC
+done
+
+# RESULT_FILE의 값을 읽어 최종 결과 출력
+RESULT=$(cat $RESULT_FILE)
+if [ "$RESULT" = "true" ]; then
+  echo "[Ble] OK"
+  echo "[Ble] OK"
+  echo "[Ble] OK"
+else
+  echo "[Ble] FAIL"
+fi
