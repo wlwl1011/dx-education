@@ -57,12 +57,20 @@ done
 TARGET_MAC=${TARGET_MAC:-"8A:88:4B:60:1F:FF"} # 찾고자 하는 MAC 주소
 TIMEOUT=${TIMEOUT:-30} # 스캔할 최대 시간(초)
 
+# 프로세스 종료를 처리하기 위한 트랩 설정
+cleanup() {
+  echo "Stopping scan..."
+  echo "scan off" | bluetoothctl > /dev/null
+  echo "exit" | bluetoothctl > /dev/null
+}
+trap cleanup EXIT
+
 # bluetoothctl 실행 및 상호작용
 {
   echo "scan on"
-  sleep $TIMEOUT
-  echo "scan off"
-  echo "exit"
+  sleep $TIMEOUT &
+  wait
+  cleanup
 } | bluetoothctl > $BLUETOOTH_LOG 2>&1 &  # bluetoothctl 출력을 로그 파일에 리디렉션
 
 # bluetoothctl PID 저장
@@ -79,14 +87,11 @@ while [ $SECONDS -lt $end_time ]; do
   if echo "$devices" | grep -q "$TARGET_MAC"; then
     echo "true" > $RESULT_FILE
     echo "Found target MAC: $TARGET_MAC"
-    kill $bt_pid
+    kill $bt_pid 2>/dev/null
     break
   fi
   sleep 1
 done
-
-# 스캔이 종료되었는지 확인합니다.
-wait $bt_pid 2>/dev/null
 
 # 모든 장치 제거
 bluetoothctl devices | grep "Device" | while read -r line; do
