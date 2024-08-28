@@ -1,39 +1,116 @@
-import subprocess
 
-# wlan0_test.sh 파일 실행
-script_path = './wlan0_test.sh'  # 스크립트 경로
-interface = 'wlan0'  # 인터페이스 이름
-log_file = 'last_log.txt'  # 로그를 저장할 파일 이름
+#!/bin/bash
 
-try:
-    process = subprocess.Popen(
-        [script_path, interface],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
-        bufsize=1  # Line buffering
-    )
+#./ble_test.sh -m "8A:88:4B:40:1D:64" -t 60
 
-    last_line = ""
-    with open(log_file, 'w') as f:
-        while True:
-            output = process.stdout.readline()
-            if output == '' and process.poll() is not None:
-                break
-            if output:
-                print(output, end='')  # 터미널에 실시간 출력
-                last_line = output.strip()  # 마지막 줄 갱신
-                f.write(output)  # 로그 파일에 기록
+# 명령 인자 처리
+while getopts "m:t:" opt; do
+  case $opt in
+    m) TARGET_MAC="$OPTARG" ;;
+    t) TIMEOUT="$OPTARG" ;;
+    \?) echo "Invalid option -$OPTARG" >&2 ;;
+  esac
+done
 
-        process.wait()  # 프로세스가 종료될 때까지 대기
+echo "TARGET_MAC: $TARGET_MAC"
 
-    # 마지막 줄을 파일에 저장
-    with open(log_file, 'a') as f:
-        f.write(f"\nLast line: {last_line}\n")
+# 현재 BLE MAC 주소를 가져오는 함수
+get_current_mac_address() {
+    result=$(hcitool dev)
+    echo "$result" | while read -r line; do
+        if [[ $line == hci* ]]; then
+            mac_address=$(echo $line | awk '{print $2}')
+            echo "$mac_address"
+            return
+        fi
+    done
+    exit 1
+}
 
-    print(f"\nLast log line saved to {log_file}")
 
-except subprocess.CalledProcessError as e:
-    print(f"Script failed with return code {e.returncode}")
-except FileNotFoundError:
-    print("Script file not found. Please check the script path.")
+# 현재 BLE MAC 주소를 가져오기
+current_mac=$(get_current_mac_address)
+echo "Current BLE MAC address is: $current_mac"
+
+# 사용자에게 의도한 MAC 주소가 맞는지 묻기
+while true; do
+    echo "Is this the intended MAC address? (y/n): "
+    read user_input
+    user_input=$(echo "$user_input" | tr '[:upper:]' '[:lower:]')  # 소문자로 변환
+    if [[ "$user_input" == "y" ]]; then
+        echo "Proceeding with the intended MAC address."
+        break
+    elif [[ "$user_input" == "n" ]]; then
+        echo "[ble] FAIL"
+        exit 1
+    else
+        echo -e "\nInvalid input. Please enter 'y' or 'n'."
+    fi
+done
+
+
+# 기본값 설정
+TARGET_MAC=${TARGET_MAC:-"8A:88:4B:60:1F:FF"} # 찾고자 하는 MAC 주소
+TIMEOUT=${TIMEOUT:-30} # 스캔할 최대 시간(초)
+
+# 결과 파일 초기화
+RESULT_FILE="device_found.txt"
+echo "false" > $RESULT_FILE
+
+# 스캔 결과를 저장할 파일 경로
+LOG_FILE="log.txt"
+> $LOG_FILE # 파일 초기화
+
+# bluetoothctl을 사용하여 스캔을 시작
+echo "Starting scan..."
+
+# 스캔 결과를 LOG_FILE에 저장하고 터미널에 출력하는 백그라운드 프로세스 시작
+{
+  end_time=$((SECONDS + TIMEOUT))
+
+  # 서브쉘에서 bluetoothctl 실행
+  {
+    sleep 1
+    echo -e 'scan on\n'
+    sleep $TIMEOUT
+    echo -e 'scan off\n'
+    sleep 1
+    echo -e 'exit\n'
+  } | bluetoothctl &
+
+  # MAC 주소를 찾기 위한 루프
+  while [ $SECONDS -lt $end_time ]; do
+    # bluetoothctl devices 명령어의 출력을 LOG_FILE에 저장하고 터미널에 출력
+    bluetoothctl devices | tee -a $LOG_FILE
+
+    # LOG_FILE에서 TARGET_MAC이 있는지 확인
+    if grep -q "$TARGET_MAC" $LOG_FILE; then
+      echo "true" > $RESULT_FILE
+      echo "found target mac"
+    fi
+    sleep 1
+  done &
+  
+  # 백그라운드 프로세스가 종료될 때까지 대기
+  wait
+
+  echo "Stopping scan..."
+  sleep 2
+
+  # 모든 장치 제거
+  echo "Removing all devices..."
+  bluetoothctl devices | grep "Device" | while read -r line; do
+    MAC=$(echo $line | awk '{print $2}')
+    bluetoothctl remove $MAC
+  done
+
+  # RESULT_FILE의 값을 읽어 최종 결과 출력
+  RESULT=$(cat $RESULT_FILE)
+  if [ "$RESULT" = "true" ]; then
+    echo "[Ble] OK"
+    echo "[Ble] OK"
+    echo "[Ble] OK"
+  else
+    echo "[Ble] FAIL"
+  fi
+}
