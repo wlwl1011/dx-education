@@ -1,12 +1,28 @@
 #!/usr/bin/env python3
 
 import subprocess
-import sys
-import select
 import os
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import yaml
+
+# 사용자에게 날짜 입력을 받아 확인
+def get_log_date():
+    while True:
+        date_input = input("Enter the log date (YYYY-MM-DD, leave empty for today's date): ")
+        if not date_input:
+            log_date = datetime.now().strftime('%Y-%m-%d')
+            break
+        try:
+            log_date = datetime.strptime(date_input, '%Y-%m-%d').strftime('%Y-%m-%d')
+            confirm = input(f"Confirm log date as {log_date}? (y/n): ").strip().lower()
+            if confirm == 'y':
+                break
+        except ValueError:
+            print("Invalid date format. Please use YYYY-MM-DD.")
+    return log_date
+
+log_date = get_log_date()
 
 # YAML 파일 읽기
 with open('/lg_rw/fct_test/cfg.yml', 'r') as file:
@@ -38,30 +54,41 @@ network={{
     # wpa_supplicant.conf 파일 복사 및 권한 설정
     subprocess.run("cp -f /lg_rw/fct_test/wpa_supplicant.conf /etc/wpa_supplicant.conf", shell=True)
     subprocess.run("chmod +x /etc/wpa_supplicant.conf", shell=True)
-    # 인터넷 연결 확인 및 시간 동기화
-    # subprocess.run("wpa_supplicant -B -i wlan0 -c /etc/wpa_supplicant.conf -q &> /dev/null", shell=True)
-    # subprocess.run("dhclient wlan0", shell=True)
 
-# NTP 동기화 상태 확인
-# ntp_status = subprocess.run("timedatectl show -p NTPSynchronized --value", shell=True, capture_output=True, text=True).stdout.strip()
+# WiFi 및 BLE MAC 주소 읽기
+def get_mac_address(interface):
+    try:
+        mac = subprocess.run(f"cat /sys/class/net/{interface}/address", shell=True, capture_output=True, text=True).stdout.strip()
+    except Exception as e:
+        mac = "unknown"
+    return mac
 
-# # NTP 동기화가 되어 있지 않으면 시간 동기화 시도
-# if ntp_status != "yes":
-#     print("NTP not synchronized. Synchronizing time...")
-#     subprocess.run("ntpdate -u pool.ntp.org", shell=True)
-#     ntp_status = subprocess.run("timedatectl show -p NTPSynchronized --value", shell=True, capture_output=True, text=True).stdout.strip()
-#     if ntp_status != "yes":
-#         print("Failed to synchronize time.")
+wifi_mac = get_mac_address('wlan0')
+ble_mac = get_mac_address('hci0')  # hci0은 BLE 인터페이스로 가정
 
 # 로그 파일 설정
 log_file_path = '/lg_rw/fct_test/fct_test.log'
+usb_log_file_name = f"fct_test_{wifi_mac}_{ble_mac}.log"
+usb_log_file_path = None
 
-# 로그 파일에 시간 기록
+# 로그 파일에 날짜 기록
 with open(log_file_path, 'a') as log_file:
     log_file.write("###############################################################\n")
-    # log_file.write(f"Test started at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
-    # if ntp_status != "yes":
-    #     log_file.write("Failed to synchronize time.\n")
+    log_file.write(f"Test started at: {log_date} {datetime.now().strftime('%H:%M:%S')}\n")
+
+# USB에 로그 파일 저장할 경로 찾기
+def find_usb_mount_point():
+    mount_points = subprocess.run("lsblk -o MOUNTPOINT,FSTYPE", shell=True, capture_output=True, text=True).stdout.splitlines()
+    for mount_point in mount_points:
+        if "exfat" in mount_point or "/media" in mount_point or "/mnt" in mount_point:
+            return mount_point.split()[0].strip()
+    return None
+
+usb_mount_point = find_usb_mount_point()
+if usb_mount_point:
+    usb_log_file_path = os.path.join(usb_mount_point, usb_log_file_name)
+else:
+    print("USB not found or not mounted. The log will only be saved locally.")
 
 # 테스트 항목들
 test_items = {
@@ -103,7 +130,6 @@ def run_test_script(script, args):
             print("result message include UnicodeDecodeError. Ignoring the line.")
     process.wait()  # Add this line
     return process.returncode, log_lines
-
 
 #실시간 출력을 처리하는 함수
 def run_test_script_spi(script, args):
@@ -154,7 +180,6 @@ def execute_test(item, script):
                 result_code, log_lines = run_test_script(f"/lg_rw/fct_test/{script}", args)
                 last_line = log_lines[-1] if log_lines else "No output"
 
-
             print(last_line, flush=True)
 
             if "OK" in last_line:
@@ -187,37 +212,27 @@ total_count = 0
 print("-" * 40, flush=True)
 print("-" * 40, flush=True)
 with open(log_file_path, 'a') as log_file:
-    for test_name, result in test_results.items():
-        total_count += 1
-        print(result, flush=True)
-        log_file.write(f"{test_name}: {result}\n")
-        if "OK" not in result:
-            all_tests_passed = False
-            failed_count += 1
-    print("-" * 40, flush=True)
-    print("-" * 40, flush=True)
-    log_file.write("-" * 40 + "\n")
+    if usb_log_file_path:
+        with open(usb_log_file_path, 'a') as usb_log_file:
+            for test_name, result in test_results.items():
+                total_count += 1
+                print(result, flush=True)
+                log_file.write(f"{test_name}: {result}\n")
+                usb_log_file.write(f"{test_name}: {result}\n")
+            print("-" * 40, flush=True)
+            print("-" * 40, flush=True)
+            log_file.write("-" * 40 + "\n")
+            usb_log_file.write("-" * 40 + "\n")
 
 # 전체 테스트 결과 출력
 with open(log_file_path, 'a') as log_file:
-    if all_tests_passed:
-        print("[ALL TESTS]: OK", flush=True)
-        log_file.write("[ALL TESTS]: OK\n")
-    else:
-        print(f"[ALL TESTS]: {failed_count} out of {total_count} tests failed", flush=True)
-        log_file.write(f"[ALL TESTS]: {failed_count} out of {total_count} tests failed\n")
-
-# Autostart 설정
-if global_config.get('autostart', False):
-    service_name = "my_dq1_app.service"
-    service_path = f"/usr/lib/systemd/system/{service_name}"
-    # 서비스가 이미 활성화되어 있는지 확인
-    is_enabled = subprocess.run(f"systemctl is-enabled {service_name}", shell=True, capture_output=True, text=True).stdout.strip()
-    if is_enabled != "enabled":
-        # 디렉토리가 없으면 생성
-        os.makedirs(os.path.dirname(service_path), exist_ok=True)
-        # 서비스 파일 복사 및 권한 설정
-        subprocess.run(f"cp -f /lg_rw/fct_test/{service_name} {service_path}", shell=True)
-        subprocess.run("systemctl daemon-reload", shell=True)
-        subprocess.run(f"systemctl start {service_name}", shell=True)
-        subprocess.run(f"systemctl enable {service_name}", shell=True)
+    if usb_log_file_path:
+        with open(usb_log_file_path, 'a') as usb_log_file:
+            if all_tests_passed:
+                print("[ALL TESTS]: OK", flush=True)
+                log_file.write("[ALL TESTS]: OK\n")
+                usb_log_file.write("[ALL TESTS]: OK\n")
+            else:
+                print(f"[ALL TESTS]: {failed_count} out of {total_count} tests failed", flush=True)
+                log_file.write(f"[ALL TESTS]: {failed_count} out of {total_count} tests failed\n")
+                usb_log_file.write(f"[ALL TESTS]: {failed_count} out of {total_count} tests failed\n")
