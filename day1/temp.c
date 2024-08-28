@@ -1,2 +1,1 @@
-root@dq1:/lg_rw/fct_test# lsblk -o NAME,TYPE | grep 'disk' | grep -o '^sd[a-z]'                                  
-sda   
+partitions = [f"/dev/{usb_dev_name}{p}" for p in "1 2 3 4".split()]
