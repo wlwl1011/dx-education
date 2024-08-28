@@ -18,9 +18,6 @@ echo "false" > $RESULT_FILE
 > $LOG_FILE
 > $BLUETOOTH_LOG
 
-# 표준 출력과 표준 오류를 로그 파일로 리디렉션
-exec > $LOG_FILE 2>&1
-
 echo "TARGET_MAC: $TARGET_MAC"
 
 # 현재 BLE MAC 주소를 가져오는 함수
@@ -66,7 +63,7 @@ TIMEOUT=${TIMEOUT:-30} # 스캔할 최대 시간(초)
   sleep $TIMEOUT
   echo "scan off"
   echo "exit"
-} | bluetoothctl > $BLUETOOTH_LOG 2>&1 &  # 모든 출력을 bluetoothctl.log에 리디렉션
+} | bluetoothctl > $BLUETOOTH_LOG 2>&1 &  # bluetoothctl 출력을 로그 파일에 리디렉션
 
 # bluetoothctl PID 저장
 bt_pid=$!
@@ -96,9 +93,6 @@ bluetoothctl devices | grep "Device" | while read -r line; do
   MAC=$(echo $line | awk '{print $2}')
   bluetoothctl remove $MAC
 done
-
-# 표준 출력을 다시 터미널로 리디렉션
-exec > /dev/tty 2>&1
 
 # 결과 출력
 RESULT=$(cat $RESULT_FILE)
