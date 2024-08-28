@@ -1,7 +1,6 @@
-
 #!/bin/bash
 
-#./ble_test.sh -m "8A:88:4B:40:1D:64" -t 60
+# ./ble_test.sh -m "8A:88:4B:40:1D:64" -t 60
 
 # 명령 인자 처리
 while getopts "m:t:" opt; do
@@ -27,7 +26,6 @@ get_current_mac_address() {
     exit 1
 }
 
-
 # 현재 BLE MAC 주소를 가져오기
 current_mac=$(get_current_mac_address)
 echo "Current BLE MAC address is: $current_mac"
@@ -48,7 +46,6 @@ while true; do
     fi
 done
 
-
 # 기본값 설정
 TARGET_MAC=${TARGET_MAC:-"8A:88:4B:60:1F:FF"} # 찾고자 하는 MAC 주소
 TIMEOUT=${TIMEOUT:-30} # 스캔할 최대 시간(초)
@@ -65,18 +62,17 @@ LOG_FILE="log.txt"
 echo "Starting scan..."
 
 # 스캔 결과를 LOG_FILE에 저장하고 터미널에 출력하는 백그라운드 프로세스 시작
-{
+(
   end_time=$((SECONDS + TIMEOUT))
 
-  # 서브쉘에서 bluetoothctl 실행
+  # bluetoothctl 실행을 위한 서브쉘
   {
     sleep 1
     echo -e 'scan on\n'
-    sleep $TIMEOUT
-    echo -e 'scan off\n'
-    sleep 1
-    echo -e 'exit\n'
   } | bluetoothctl &
+
+  # bluetoothctl PID 저장
+  bt_pid=$!
 
   # MAC 주소를 찾기 위한 루프
   while [ $SECONDS -lt $end_time ]; do
@@ -87,12 +83,21 @@ echo "Starting scan..."
     if grep -q "$TARGET_MAC" $LOG_FILE; then
       echo "true" > $RESULT_FILE
       echo "found target mac"
+      kill $bt_pid  # bluetoothctl 종료
+      break
     fi
     sleep 1
-  done &
-  
-  # 백그라운드 프로세스가 종료될 때까지 대기
-  wait
+  done
+
+  # 종료 시 scan off 및 bluetoothctl exit
+  if ps -p $bt_pid > /dev/null; then
+    {
+      echo -e 'scan off\n'
+      sleep 1
+      echo -e 'exit\n'
+    } | bluetoothctl
+    wait $bt_pid
+  fi
 
   echo "Stopping scan..."
   sleep 2
@@ -113,4 +118,5 @@ echo "Starting scan..."
   else
     echo "[Ble] FAIL"
   fi
-}
+) &
+wait
