@@ -3,7 +3,6 @@
 import subprocess
 import os
 from datetime import datetime
-# from concurhrent.futures import ThreadPoolExecutor, as_completed
 import yaml
 
 # 사용자에게 날짜 입력을 받아 확인
@@ -87,6 +86,15 @@ def find_usb_mount_point():
 usb_mount_point = find_usb_mount_point()
 if usb_mount_point:
     usb_log_file_path = os.path.join(usb_mount_point, usb_log_file_name)
+    usb_log_dir = os.path.dirname(usb_log_file_path)
+
+    # 디렉토리가 없으면 생성
+    if not os.path.exists(usb_log_dir):
+        try:
+            os.makedirs(usb_log_dir)
+        except OSError as e:
+            print(f"Failed to create directory {usb_log_dir}: {e}")
+            usb_log_file_path = None
 else:
     print("USB not found or not mounted. The log will only be saved locally.")
 
@@ -189,22 +197,6 @@ def execute_test(item, script):
             # If the loop completes without a break, record the last result
             test_results[test_name] = last_line
 
-# 병렬 실행 여부 확인
-# parallel = config.get('global', {}).get('parallel', False)
-# if parallel:
-#     with ThreadPoolExecutor() as executor:
-#         futures = {executor.submit(execute_test, item, script): item for item, script in test_items.items()}
-#         for future in as_completed(futures):
-#             item = futures[future]
-#             try:
-#                 future.result()
-#             except Exception as exc:
-#                 print(f"{item} generated an exception: {exc}")
-# else:
-#     for item, script in test_items.items():
-#         execute_test(item, script)
-
-
 # 테스트 결과 확인 및 출력
 all_tests_passed = True
 failed_count = 0
@@ -217,39 +209,4 @@ with open(log_file_path, 'a') as log_file:
             for test_name, result in test_results.items():
                 total_count += 1
                 print(result, flush=True)
-                log_file.write(f"{test_name}: {result}\n")
-                usb_log_file.write(f"{test_name}: {result}\n")
-            print("-" * 40, flush=True)
-            print("-" * 40, flush=True)
-            log_file.write("-" * 40 + "\n")
-            usb_log_file.write("-" * 40 + "\n")
-
-# 전체 테스트 결과 출력
-with open(log_file_path, 'a') as log_file:
-    if usb_log_file_path:
-        with open(usb_log_file_path, 'a') as usb_log_file:
-            if all_tests_passed:
-                print("[ALL TESTS]: OK", flush=True)
-                log_file.write("[ALL TESTS]: OK\n")
-                usb_log_file.write("[ALL TESTS]: OK\n")
-            else:
-                print(f"[ALL TESTS]: {failed_count} out of {total_count} tests failed", flush=True)
-                log_file.write(f"[ALL TESTS]: {failed_count} out of {total_count} tests failed\n")
-                usb_log_file.write(f"[ALL TESTS]: {failed_count} out of {total_count} tests failed\n")
-
-
-
-# Autostart 설정
-if global_config.get('autostart', False):
-    service_name = "my_dq1_app.service"
-    service_path = f"/usr/lib/systemd/system/{service_name}"
-    # 서비스가 이미 활성화되어 있는지 확인
-    is_enabled = subprocess.run(f"systemctl is-enabled {service_name}", shell=True, capture_output=True, text=True).stdout.strip()
-    if is_enabled != "enabled":
-        # 디렉토리가 없으면 생성
-        os.makedirs(os.path.dirname(service_path), exist_ok=True)
-        # 서비스 파일 복사 및 권한 설정
-        subprocess.run(f"cp -f /lg_rw/fct_test/{service_name} {service_path}", shell=True)
-        subprocess.run("systemctl daemon-reload", shell=True)
-        subprocess.run(f"systemctl start {service_name}", shell=True)
-        subprocess.run(f"systemctl enable {service_name}", shell=True)
+                log_file.write(f"{
