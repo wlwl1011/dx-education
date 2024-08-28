@@ -6,7 +6,6 @@ from datetime import datetime
 import yaml
 import glob
 
-
 # 사용자에게 날짜 입력을 받아 확인
 def get_log_date():
     while True:
@@ -32,30 +31,6 @@ with open('/lg_rw/fct_test/cfg.yml', 'r') as file:
 # global 설정 읽기
 global_config = config['global']
 
-# WiFi 설정을 wpa_supplicant.conf 파일에 작성
-wifi_config = config['wifi']
-if wifi_config['enable']:
-    wpa_supplicant_conf = f"""
-ctrl_interface=/var/run/wpa_supplicant
-ctrl_interface_group=0
-update_config=1
-network={{
-    ssid="{wifi_config['ssid']}"
-    psk="{wifi_config['password']}"
-    key_mgmt=WPA-PSK
-}}
-"""
-    with open('/lg_rw/fct_test/wpa_supplicant.conf', 'w') as wpa_file:
-        wpa_file.write(wpa_supplicant_conf)
-
-    # 네트워크 인터페이스 설정
-    subprocess.run("dmesg -n 1", shell=True)
-    subprocess.run("mount -o rw,remount /", shell=True)
-    subprocess.run("ifconfig wlan0 up", shell=True)
-    # wpa_supplicant.conf 파일 복사 및 권한 설정
-    subprocess.run("cp -f /lg_rw/fct_test/wpa_supplicant.conf /etc/wpa_supplicant.conf", shell=True)
-    subprocess.run("chmod +x /etc/wpa_supplicant.conf", shell=True)
-
 # WiFi 및 BLE MAC 주소 읽기
 def get_mac_address(interface):
     try:
@@ -75,7 +50,10 @@ usb_log_file_path = None
 # USB 마운트 및 로그 작성
 def mount_usb_and_save_log():
     global usb_log_file_path
-    mount_point = "/lg_rw/fct_test"  # USB를 마운트할 임시 경로
+    mount_point = "/mnt/usb_test"  # USB를 마운트할 임시 경로
+
+    if not os.path.exists(mount_point):
+        os.makedirs(mount_point)
 
     # USB 장치 이름 확인
     usb_dev_name = subprocess.run("lsblk -o NAME,TYPE | grep 'disk' | grep -o '^sd[a-z]'", shell=True, capture_output=True, text=True).stdout.strip()
@@ -87,18 +65,21 @@ def mount_usb_and_save_log():
     partitions = glob.glob(f"/dev/{usb_dev_name}*")
     mount_success = False
     for partition in partitions:
-        print(f"mount {partition} {mount_point}")
+        print(f"Attempting to mount {partition} to {mount_point}")
         result = subprocess.run(f"mount {partition} {mount_point}", shell=True)
         if result.returncode == 0:
             mount_success = True
             usb_dev_path = partition
             break
+        else:
+            print(f"[USB]: Failed to mount {partition}")
 
     if not mount_success:
         print("[USB]: Fail - Could not mount any USB partition")
         return False
 
     usb_log_file_path = os.path.join(mount_point, usb_log_file_name)
+    print(f"USB mounted at {mount_point}. Log file will be saved at {usb_log_file_path}")
 
     # 로그 파일 작성
     try:
@@ -112,7 +93,6 @@ def mount_usb_and_save_log():
 
     # USB 언마운트
     subprocess.run(f"umount {mount_point}", shell=True)
-    # os.rmdir(mount_point)
     return True
 
 # USB에 로그 저장 시도
