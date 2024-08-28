@@ -209,4 +209,37 @@ with open(log_file_path, 'a') as log_file:
             for test_name, result in test_results.items():
                 total_count += 1
                 print(result, flush=True)
-                log_file.write(f"{
+                log_file.write(f"{test_name}: {result}\n")
+                usb_log_file.write(f"{test_name}: {result}\n")
+            print("-" * 40, flush=True)
+            print("-" * 40, flush=True)
+            log_file.write("-" * 40 + "\n")
+            usb_log_file.write("-" * 40 + "\n")
+
+# 전체 테스트 결과 출력
+with open(log_file_path, 'a') as log_file:
+    if usb_log_file_path:
+        with open(usb_log_file_path, 'a') as usb_log_file:
+            if all_tests_passed:
+                print("[ALL TESTS]: OK", flush=True)
+                log_file.write("[ALL TESTS]: OK\n")
+                usb_log_file.write("[ALL TESTS]: OK\n")
+            else:
+                print(f"[ALL TESTS]: {failed_count} out of {total_count} tests failed", flush=True)
+                log_file.write(f"[ALL TESTS]: {failed_count} out of {total_count} tests failed\n")
+                usb_log_file.write(f"[ALL TESTS]: {failed_count} out of {total_count} tests failed\n")
+
+# Autostart 설정
+if global_config.get('autostart', False):
+    service_name = "my_dq1_app.service"
+    service_path = f"/usr/lib/systemd/system/{service_name}"
+    # 서비스가 이미 활성화되어 있는지 확인
+    is_enabled = subprocess.run(f"systemctl is-enabled {service_name}", shell=True, capture_output=True, text=True).stdout.strip()
+    if is_enabled != "enabled":
+        # 디렉토리가 없으면 생성
+        os.makedirs(os.path.dirname(service_path), exist_ok=True)
+        # 서비스 파일 복사 및 권한 설정
+        subprocess.run(f"cp -f /lg_rw/fct_test/{service_name} {service_path}", shell=True)
+        subprocess.run("systemctl daemon-reload", shell=True)
+        subprocess.run(f"systemctl start {service_name}", shell=True)
+        subprocess.run(f"systemctl enable {service_name}", shell=True)
