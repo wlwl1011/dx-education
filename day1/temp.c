@@ -70,7 +70,7 @@ log_file_path = '/lg_rw/fct_test/fct_test.log'
 usb_log_file_name = f"fct_test_{wifi_mac}_{ble_mac}.log"
 usb_log_file_path = None
 
-# USB 마운트 경로를 찾고 로그 파일을 저장하는 함수
+# USB 마운트 및 로그 작성
 def mount_usb_and_save_log():
     global usb_log_file_path
     mount_point = "/mnt/usb_test"  # USB를 마운트할 임시 경로
@@ -113,8 +113,11 @@ def mount_usb_and_save_log():
     os.rmdir(mount_point)
     return True
 
+# USB에 로그 저장 시도
 if not mount_usb_and_save_log():
     print("USB logging failed. Logs will only be saved locally.")
+
+# 이후 로직은 이전과 동일하게 유지
 
 # 테스트 항목들
 test_items = {
