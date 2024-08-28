@@ -9,6 +9,15 @@ while getopts "m:t:" opt; do
   esac
 done
 
+# 결과 파일 및 로그 파일 설정
+RESULT_FILE="device_found.txt"
+LOG_FILE="log.txt"
+echo "false" > $RESULT_FILE
+> $LOG_FILE
+
+# 표준 출력과 표준 오류를 로그 파일로 리디렉션
+exec > $LOG_FILE 2>&1
+
 echo "TARGET_MAC: $TARGET_MAC"
 
 # 현재 BLE MAC 주소를 가져오는 함수
@@ -48,12 +57,6 @@ done
 TARGET_MAC=${TARGET_MAC:-"8A:88:4B:60:1F:FF"} # 찾고자 하는 MAC 주소
 TIMEOUT=${TIMEOUT:-30} # 스캔할 최대 시간(초)
 
-# 결과 파일 초기화
-RESULT_FILE="device_found.txt"
-LOG_FILE="log.txt"
-echo "false" > $RESULT_FILE
-> $LOG_FILE
-
 # bluetoothctl 실행 및 상호작용
 {
   echo "scan on"
@@ -73,8 +76,6 @@ while [ $SECONDS -lt $end_time ]; do
   devices=$(bluetoothctl devices)
 
   # 디바이스 목록에서 TARGET_MAC이 있는지 확인합니다.
-  echo "$devices" | tee -a $LOG_FILE
-
   if echo "$devices" | grep -q "$TARGET_MAC"; then
     echo "true" > $RESULT_FILE
     echo "Found target MAC: $TARGET_MAC"
@@ -88,11 +89,13 @@ done
 wait $bt_pid 2>/dev/null
 
 # 모든 장치 제거
-echo "Removing all devices..."
 bluetoothctl devices | grep "Device" | while read -r line; do
   MAC=$(echo $line | awk '{print $2}')
   bluetoothctl remove $MAC
 done
+
+# 표준 출력을 다시 터미널로 리디렉션
+exec > /dev/tty 2>&1
 
 # 결과 출력
 RESULT=$(cat $RESULT_FILE)
