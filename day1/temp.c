@@ -3,7 +3,7 @@
 # 명령 인자 처리
 while getopts "m:t:" opt; do
   case $opt in
-    m) TARGET_MAC="$OPTARG" ;;
+    m) TARGET_MACS="$OPTARG" ;;  # 여러 MAC 주소를 받기 위해 변수 이름을 복수형으로 변경
     t) TIMEOUT="$OPTARG" ;;
     \?) echo "Invalid option -$OPTARG" >&2 ;;
   esac
@@ -18,7 +18,10 @@ echo "false" > $RESULT_FILE
 > $LOG_FILE
 > $BLUETOOTH_LOG
 
-echo "TARGET_MAC: $TARGET_MAC"
+# 여러 MAC 주소를 배열로 변환 (콤마로 구분된 경우)
+IFS=',' read -r -a MAC_ARRAY <<< "$TARGET_MACS"
+
+echo "TARGET_MACS: ${MAC_ARRAY[*]}"
 
 # 현재 BLE MAC 주소를 가져오는 함수
 get_current_mac_address() {
@@ -37,13 +40,18 @@ get_current_mac_address() {
 current_mac=$(get_current_mac_address)
 echo "Current BLE MAC address is: $current_mac"
 
-# 사용자에게 의도한 MAC 주소가 맞는지 묻기
+# 사용자에게 의도한 MAC 주소들이 맞는지 묻기
+echo "The following MAC addresses will be scanned for:"
+for mac in "${MAC_ARRAY[@]}"; do
+  echo "$mac"
+done
+
 while true; do
-    echo "Is this the intended MAC address? (y/n): "
+    echo "Are these the intended MAC addresses? (y/n): "
     read user_input
     user_input=$(echo "$user_input" | tr '[:upper:]' '[:lower:]')  # 소문자로 변환
     if [[ "$user_input" == "y" ]]; then
-        echo "Proceeding with the intended MAC address."
+        echo "Proceeding with the intended MAC addresses."
         break
     elif [[ "$user_input" == "n" ]]; then
         echo "[ble] FAIL"
@@ -54,7 +62,6 @@ while true; do
 done
 
 # 기본값 설정
-TARGET_MAC=${TARGET_MAC:-"8A:88:4B:60:1F:FF"} # 찾고자 하는 MAC 주소
 TIMEOUT=${TIMEOUT:-30} # 스캔할 최대 시간(초)
 
 # 프로세스 종료를 처리하기 위한 트랩 설정
@@ -82,13 +89,15 @@ while [ $SECONDS -lt $end_time ]; do
   # bluetoothctl에서 디바이스 목록을 가져옵니다.
   devices=$(bluetoothctl devices)
 
-  # 디바이스 목록에서 TARGET_MAC이 있는지 확인합니다.
-  if echo "$devices" | grep -q "$TARGET_MAC"; then
-    echo "true" > $RESULT_FILE
-    echo "Found target MAC: $TARGET_MAC"
-    kill $bt_pid 2>/dev/null
-    break
-  fi
+  # 디바이스 목록에서 MAC_ARRAY의 어느 하나라도 있는지 확인합니다.
+  for mac in "${MAC_ARRAY[@]}"; do
+    if echo "$devices" | grep -q "$mac"; then
+      echo "true" > $RESULT_FILE
+      echo "Found target MAC: $mac"
+      kill $bt_pid 2>/dev/null
+      break 2  # MAC 주소를 찾으면 두 개의 루프를 탈출
+    fi
+  done
   sleep 1
 done
 
